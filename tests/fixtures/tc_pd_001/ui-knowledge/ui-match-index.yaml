@@ -1,0 +1,17 @@
+pages:
+  - knowledge_id: page-prod
+    business_terms: [产品, 产品管理, 产品列表, 产品详情]
+    component_ids: [component-module-navigation, component-page-settings-panel, component-product-url-editor, component-password-access-control, component-password-gate]
+    permission_refs: [permission-product-page-settings]
+    runtime_refs: [runtime-navigation-controller-resolution, runtime-password-page-presentation, runtime-password-verification-transition]
+components:
+  - knowledge_id: component-module-navigation
+    role: UI_SURFACE
+  - knowledge_id: component-page-settings-panel
+    role: UI_SURFACE
+  - knowledge_id: component-product-url-editor
+    role: UI_SURFACE
+  - knowledge_id: component-password-access-control
+    role: UI_SURFACE
+  - knowledge_id: component-password-gate
+    role: UI_SURFACE
