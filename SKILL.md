@@ -10,10 +10,10 @@ metadata:
 Use this Skill when the user wants a business test case translated into the formal
 `automation-intent.yaml v1.0` intermediate representation.
 
-The Skill consumes Test Case, PRD, Prototype, and existing `ui-knowledge/` assets and
-produces `automation-intent.yaml`. Its output describes business intent, semantic UI
-context, semantic steps, required capabilities, assertions, evidence, and runtime
-unknowns. It is an input to a future Asset Matcher.
+The Skill consumes Test Case, PRD, Prototype, and, when available, existing
+`ui-knowledge/` assets and produces `automation-intent.yaml`. Its output describes
+business intent, semantic UI context, semantic steps, required capabilities, assertions,
+evidence, and runtime unknowns. It is an input to a future Asset Matcher.
 
 ## Hard boundary
 
@@ -22,6 +22,11 @@ Do not perform any of the following:
 - choose or match an automation asset;
 - emit `reuse-plan`, `matched_asset`, `selected_asset`, `reuse_readiness`,
   `effective_reuse_readiness`, or `dependency_closure`;
+- read or use `automation-assets/`, its `match-index.yaml`, `dependency-index.yaml`,
+  historical Playwright registries, or historical run reports reachable only through
+  that asset library;
+- use historical automation code or asset evidence to claim that the current business
+  behavior has been verified;
 - generate CSS, XPath, `nth`, `locator(...)`, or any final Locator;
 - generate Playwright code;
 - explore the browser or turn runtime observations into invented static facts;
@@ -52,14 +57,22 @@ user specifies another path. If the file already exists, update the matching sta
 
 ## Required workflow
 
-1. Read the normative reference and inspect the supplied source material. If `ui-knowledge`
-   exists, search `ui-match-index.yaml` before opening detailed profile files.
+1. Read the normative reference and inspect the supplied source material. Resolve
+   `ui-knowledge/` before generating UI references: search `ui-match-index.yaml` first,
+   then open only the relevant `runtime-required.yaml`, `pages.yaml`, `components.yaml`,
+   `interaction-rules.yaml`, and `permissions.yaml` records. Never search
+   `automation-assets/` during this stage.
 2. Establish the business contract from PRD and Test Case. For business expectations,
    PRD has priority over Test Case. A conflict is recorded as a blocking issue; never
    choose the “most reasonable” interpretation.
-3. Resolve semantic page, region, and component references from Prototype plus UI Profile
-   evidence. Preserve every Knowledge ID. A UI Profile fact marked `CODE_CONFIRMED` or
-   `CODE_INFERRED` is not automatically business `CONFIRMED`.
+3. Resolve semantic page, region, and component references from `ui-match-index.yaml`
+   plus detailed UI Profile evidence. Preserve every real Knowledge ID in
+   `ui_context.*.knowledge_ref`, `ui_context.related_components[].knowledge_ref`,
+   `required_capabilities[].ui_knowledge_refs`, and `knowledge.ui_profile_refs`.
+   A UI Profile fact marked `CODE_CONFIRMED` or `CODE_INFERRED` is not automatically
+   business `CONFIRMED`. Do not use an `INFRASTRUCTURE` component as a UI Target by
+   default, and do not treat a `variant` with `activation: RUNTIME_REQUIRED` as an
+   unconditional fact.
 4. Create the exact top-level shape under `intent`: `id`, `lifecycle`, `case`,
    `eligibility`, `goal`, `test_data`, `preconditions`, `ui_context`, `steps`,
    `required_capabilities`, `assertions`, `knowledge`, `runtime_unknowns`,
@@ -84,15 +97,27 @@ user specifies another path. If the file already exists, update the matching sta
    decision, priority, affected Steps/Capabilities, UI runtime reference, and a
    preferred resolution. `blocking: true` means the affected Step must not execute
    before resolution; it does not prevent generating the Intent or matching assets.
-10. Set `validation.ready_for_asset_matching: true` only when the business goal, at least
-    one valid Step, Step-to-Capability coverage, capability references, and at least one
-    core business Assertion are complete and there is no requirements-level blocking
-    ambiguity. Runtime Unknowns alone do not make it false.
-11. Run the lightweight validator when available:
+10. If `ui-knowledge/` is absent, explicitly degrade: use `null` for every
+    `knowledge_ref` and `ui_runtime_ref`, add the `UI_KNOWLEDGE_NOT_AVAILABLE` warning,
+    and do not invent a profile or runtime ID. A non-null UI reference is valid only if
+    it resolves to an ID in the supplied `ui-knowledge/`.
+11. Treat business assertions and Runtime Unknowns as separate classes. A result already
+    stated by the Test Case or PRD is a business Assertion, not an unknown. Runtime
+    Unknowns may ask only about implementation, presentation, entry/control semantics,
+    navigation/refresh/async behavior, DOM/overlay/iframe behavior, or similar runtime
+    mechanics. For example, “show the password page” and “show product content after
+    correct verification” are assertions; “is the gate rendered as a page replacement,
+    overlay, or another surface?” is a Runtime Unknown.
+12. Set `validation.ready_for_asset_matching: true` only when the business goal, at least
+   one valid Step, Step-to-Capability coverage, capability references, and at least one
+   core business Assertion are complete and there is no requirements-level blocking
+   ambiguity. Runtime Unknowns alone do not make it false.
+13. Run the lightweight validator when available:
     `python3 scripts/validate_automation_intent.py automation-intent.yaml`.
     Fix structural violations, forbidden Locator syntax, source-type violations, missing
-    references, and Secret values before reporting completion.
-12. Return the Intent Summary described below.
+    references, unresolved UI IDs, forbidden asset references, lifecycle inconsistencies,
+    and Secret values before reporting completion.
+14. Return the Intent Summary described below.
 
 ## Source and conflict rules
 
@@ -112,6 +137,44 @@ Use this precedence for conflicting evidence:
 Do not use `MODEL_GUESS` as a source. Record model reasoning as an inferred fact with a
 transparent basis. Do not use an `INFRASTRUCTURE` component as a UI Target by default.
 Do not treat a variant rule whose activation is `RUNTIME_REQUIRED` as unconditional.
+
+## UI Knowledge, runtime input, and degradation
+
+`ui-knowledge/` is a formal input, not optional decoration. The preferred lookup order
+is `ui-match-index.yaml` → the matching page/component/rule/permission records → the
+matching `runtime-required.yaml` record. When a match exists, retain the real ID in all
+applicable UI context, capability, and knowledge reference fields. Never manufacture an
+ID from a Step, Capability, Intent, or Runtime Unknown ID (for example `RU-01`).
+
+If no `ui-knowledge/` is available, the Intent may still be generated from the Test
+Case/PRD/Prototype, but every UI `knowledge_ref` and `ui_runtime_ref` must be `null` and
+`validation.warnings` must contain `UI_KNOWLEDGE_NOT_AVAILABLE`. This is a transparent
+degradation, not permission to create placeholder UI Profile references.
+
+Runtime Observation is a separate, explicit input. Only a user-provided
+`runtime-observation.yaml` or equivalent named Runtime Observation may populate
+`knowledge.confirmed`/`RUNTIME_VERIFIED` or `runtime_enrichment`. Finding an old report
+or any file under `automation-assets/` never qualifies. A PRE_RUNTIME Intent has no
+`runtime_enrichment`; when explicit runtime input produces enrichment,
+`lifecycle.stage` is `RUNTIME_ENRICHED`.
+
+## Preconditions and capability granularity
+
+If the Test Case explicitly says to prepare a product, account, password, or other
+fixture, the existence of that precondition is `CONFIRMED` from `TEST_CASE`. Missing
+concrete identifiers may be recorded as unresolved test data or a warning, but must not
+downgrade the whole precondition to `RUNTIME_UNKNOWN`.
+
+Capabilities are reusable semantic units for the future Asset Matcher, not a mechanical
+copy of UI micro-operations. Several consecutive, tightly coupled Steps may share one
+Capability, such as `configure_product_custom_url` for selecting a custom URL, entering
+the path, and saving it, or `configure_password_access` for selecting password access,
+entering the secret, and saving. Keep independent business abilities separate and do not
+collapse an entire Case into one `business_flow` capability.
+
+`eligibility.excluded_points` contains only source-test points intentionally excluded from
+automation. Skill boundaries such as “does not generate Locators or match assets” belong
+in this Skill, not in `excluded_points`; use `[]` when no test point is excluded.
 
 ## Data and security rules
 
@@ -146,5 +209,12 @@ After generating or updating the file, report:
 - blocking Runtime Unknown count;
 - `ready_for_asset_matching`;
 - blocking issues and warnings.
+- `ui_knowledge_available`;
+- `ui_knowledge_refs_resolved`;
+- `ui_knowledge_refs_unresolved`;
+- `pseudo_reference_count` (must be `0`);
+- `runtime_unknown_business_assertion_conflicts` (must be `0`);
+- `automation_asset_reads` (must be `0`);
+- `lifecycle_stage`.
 
 The summary is a report only. It must not contain an asset selection or Locator.
