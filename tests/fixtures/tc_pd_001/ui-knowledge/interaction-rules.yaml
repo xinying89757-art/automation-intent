@@ -1,0 +1,5 @@
+interaction_rules:
+  - rule_id: rule-product-custom-url
+    activation: CODE_CONFIRMED
+  - rule_id: rule-password-access
+    activation: CODE_CONFIRMED
