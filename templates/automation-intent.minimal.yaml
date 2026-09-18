@@ -1,4 +1,6 @@
 # Draft scaffold. Fill evidence-backed fields before setting ready_for_asset_matching: true.
+# If no ui-knowledge/ is supplied, keep every knowledge_ref/ui_runtime_ref null and keep
+# the explicit UI_KNOWLEDGE_NOT_AVAILABLE warning below. Never invent profile IDs.
 schema_version: "1.0"
 
 intent:
@@ -88,4 +90,5 @@ intent:
     blocking_issues:
       - "仍需补充业务目标、Step、Capability 和核心 Assertion"
     conflicts: []
-    warnings: []
+    warnings:
+      - UI_KNOWLEDGE_NOT_AVAILABLE
