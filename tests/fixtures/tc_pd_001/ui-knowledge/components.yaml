@@ -1,0 +1,11 @@
+components:
+  - knowledge_id: component-module-navigation
+    semantic_name: 产品模块导航
+  - knowledge_id: component-page-settings-panel
+    semantic_name: 页面设置面板
+  - knowledge_id: component-product-url-editor
+    semantic_name: 产品URL编辑器
+  - knowledge_id: component-password-access-control
+    semantic_name: 密码访问控件
+  - knowledge_id: component-password-gate
+    semantic_name: 密码输入页
