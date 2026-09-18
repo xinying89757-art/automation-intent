@@ -1,0 +1,4 @@
+pages:
+  - knowledge_id: page-prod
+    semantic_name: 产品管理与产品详情
+    component_ids: [component-module-navigation, component-page-settings-panel]
