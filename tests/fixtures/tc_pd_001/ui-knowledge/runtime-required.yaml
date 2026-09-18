@@ -1,0 +1,13 @@
+runtime_required:
+  - runtime_id: runtime-navigation-controller-resolution
+    question: "产品管理入口在真实页面中的导航呈现和入口解析方式是什么？"
+  - runtime_id: runtime-popup-mount-and-obscuration
+    question: "页面设置的承载和遮挡行为是什么？"
+  - runtime_id: runtime-custom-url-save-transition
+    question: "产品自定义URL保存后的交互呈现方式是什么？"
+  - runtime_id: runtime-page-settings-entry
+    question: "页面设置在真实页面中以何种承载方式出现？"
+  - runtime_id: runtime-password-page-presentation
+    question: "密码保护状态以何种页面或区域方式呈现？"
+  - runtime_id: runtime-password-verification-transition
+    question: "密码验证成功后以刷新、跳转还是异步加载方式呈现内容？"
