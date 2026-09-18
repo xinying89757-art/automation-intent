@@ -1,0 +1,3 @@
+permissions:
+  - permission_id: permission-product-page-settings
+    semantic_name: 产品页面设置权限
