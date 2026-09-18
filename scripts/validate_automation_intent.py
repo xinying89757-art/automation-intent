@@ -83,6 +83,24 @@ PREFERRED_RESOLUTIONS = {
     "REQUIREMENT_CONFIRMATION",
     "TEST_DATA_PREPARATION",
 }
+UI_KNOWLEDGE_FILES = (
+    "ui-match-index.yaml",
+    "runtime-required.yaml",
+    "pages.yaml",
+    "components.yaml",
+    "interaction-rules.yaml",
+    "permissions.yaml",
+)
+UI_ID_KEYS = {
+    "id",
+    "knowledge_id",
+    "page_id",
+    "component_id",
+    "interaction_rule_id",
+    "rule_id",
+    "permission_id",
+    "runtime_id",
+}
 FORBIDDEN_INTENT_KEYS = {
     "matched_asset",
     "selected_asset",
@@ -98,10 +116,24 @@ SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 
 
 class Validator:
-    def __init__(self, document: object):
+    def __init__(
+        self,
+        document: object,
+        intent_path: Path | None = None,
+        ui_knowledge_root: Path | None = None,
+    ):
         self.document = document
+        self.intent_path = intent_path
+        self.ui_knowledge_root = ui_knowledge_root
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        self.ui_knowledge_available = False
+        self.ui_knowledge_ids: set[str] = set()
+        self.ui_runtime_ids: set[str] = set()
+        self.ui_refs_resolved = 0
+        self.ui_refs_unresolved = 0
+        self.pseudo_reference_count = 0
+        self.runtime_unknown_business_assertion_conflicts = 0
 
     def error(self, message: str) -> None:
         self.errors.append(message)
@@ -137,9 +169,7 @@ class Validator:
         missing = sorted(required - set(intent))
         if missing:
             self.error(f"intent missing required keys: {', '.join(missing)}")
-        unexpected = sorted(FORBIDDEN_INTENT_KEYS & set(intent))
-        if unexpected:
-            self.error(f"Asset Matcher fields are forbidden in intent: {', '.join(unexpected)}")
+        self.check_forbidden_content(intent)
 
         self.check_lifecycle(intent.get("lifecycle"))
         self.check_case_eligibility_goal(intent)
@@ -152,7 +182,208 @@ class Validator:
         self.check_unknowns(intent.get("runtime_unknowns"))
         self.check_sources(intent)
         self.check_step_locators(intent.get("steps"))
+        self.check_ui_knowledge_references(intent)
+        self.check_runtime_enrichment(intent)
+        self.check_runtime_unknown_business_conflicts(intent)
         self.check_readiness(intent)
+
+    def warning(self, message: str) -> None:
+        if message not in self.warnings:
+            self.warnings.append(message)
+
+    def check_forbidden_content(self, intent: dict) -> None:
+        """Reject Asset Matcher fields and historical asset evidence anywhere in intent."""
+
+        def walk(node: object, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key in FORBIDDEN_INTENT_KEYS:
+                        self.error(f"Asset Matcher field is forbidden at {path}.{key}")
+                    walk(value, f"{path}.{key}")
+            elif isinstance(node, list):
+                for index, value in enumerate(node):
+                    walk(value, f"{path}[{index}]")
+            elif isinstance(node, str):
+                normalized = node.replace("\\", "/")
+                if "automation-assets/" in normalized or normalized == "automation-assets":
+                    self.error(f"automation-assets reference is forbidden at {path}")
+
+        walk(intent, "intent")
+
+    def _find_ui_knowledge_root(self) -> Path | None:
+        candidates: list[Path] = []
+        if self.ui_knowledge_root:
+            candidates.append(self.ui_knowledge_root)
+        if self.intent_path:
+            candidates.append(self.intent_path.parent / "ui-knowledge")
+        candidates.append(Path.cwd() / "ui-knowledge")
+        for candidate in candidates:
+            if candidate.is_dir():
+                return candidate
+        return None
+
+    def _collect_ui_ids(self, node: object, ids: set[str]) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in UI_ID_KEYS or key.endswith("_id"):
+                    if isinstance(value, str) and value:
+                        ids.add(value)
+                self._collect_ui_ids(value, ids)
+        elif isinstance(node, list):
+            for value in node:
+                self._collect_ui_ids(value, ids)
+
+    def _load_ui_knowledge_ids(self) -> None:
+        root = self._find_ui_knowledge_root()
+        if root is None:
+            self.warning("UI_KNOWLEDGE_NOT_AVAILABLE")
+            return
+        self.ui_knowledge_available = True
+        for filename in UI_KNOWLEDGE_FILES:
+            path = root / filename
+            if not path.is_file():
+                continue
+            try:
+                loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+            except yaml.YAMLError as exc:
+                self.error(f"invalid ui-knowledge YAML at {path}: {exc}")
+                continue
+            file_ids: set[str] = set()
+            self._collect_ui_ids(loaded, file_ids)
+            self.ui_knowledge_ids.update(file_ids)
+            if filename == "runtime-required.yaml":
+                self.ui_runtime_ids.update(file_ids)
+
+    def _intent_ui_refs(self, intent: dict) -> list[tuple[str, str, str]]:
+        refs: list[tuple[str, str, str]] = []
+
+        def walk(node: object, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key in {"knowledge_ref", "ui_runtime_ref"} and isinstance(value, str):
+                        refs.append((value, f"{path}.{key}", key))
+                    walk(value, f"{path}.{key}")
+            elif isinstance(node, list):
+                for index, value in enumerate(node):
+                    walk(value, f"{path}[{index}]")
+
+        walk(intent, "intent")
+        profile_refs = intent.get("knowledge", {}).get("ui_profile_refs", {})
+        if isinstance(profile_refs, dict):
+            for kind, values in profile_refs.items():
+                if isinstance(values, list):
+                    for index, value in enumerate(values):
+                        if isinstance(value, str):
+                            refs.append((value, f"intent.knowledge.ui_profile_refs.{kind}[{index}]", kind))
+        return refs
+
+    def check_ui_knowledge_references(self, intent: dict) -> None:
+        self._load_ui_knowledge_ids()
+        refs = self._intent_ui_refs(intent)
+        if not self.ui_knowledge_available:
+            self.ui_refs_unresolved = len(refs)
+            if refs:
+                self.pseudo_reference_count = len(refs)
+                self.error(
+                    "non-null UI references cannot be verified because ui-knowledge is unavailable"
+                )
+            warnings = intent.get("validation", {}).get("warnings", [])
+            warning_text = " ".join(str(item) for item in warnings) if isinstance(warnings, list) else str(warnings)
+            if "UI_KNOWLEDGE_NOT_AVAILABLE" not in warning_text:
+                self.error("validation.warnings must include UI_KNOWLEDGE_NOT_AVAILABLE when ui-knowledge is absent")
+            for unknown in intent.get("runtime_unknowns", []) or []:
+                if not isinstance(unknown, dict):
+                    continue
+                source = unknown.get("source")
+                if isinstance(source, dict) and source.get("type") == "UI_PROFILE_RUNTIME_REQUIRED":
+                    self.error(
+                        f"Runtime Unknown {unknown.get('id')} cannot use UI_PROFILE_RUNTIME_REQUIRED without ui-knowledge"
+                    )
+            return
+
+        for ref, path, kind in refs:
+            if ref in self.ui_knowledge_ids:
+                if kind in {"ui_runtime_ref", "runtime_refs"} and ref not in self.ui_runtime_ids:
+                    self.ui_refs_unresolved += 1
+                    self.error(f"{path} must resolve to runtime-required.yaml ID: {ref}")
+                else:
+                    self.ui_refs_resolved += 1
+            else:
+                self.ui_refs_unresolved += 1
+                self.pseudo_reference_count += 1
+                self.error(f"unresolved UI Knowledge reference at {path}: {ref}")
+
+        for unknown in intent.get("runtime_unknowns", []) or []:
+            if not isinstance(unknown, dict):
+                continue
+            source = unknown.get("source")
+            if not isinstance(source, dict) or source.get("type") != "UI_PROFILE_RUNTIME_REQUIRED":
+                continue
+            source_ref = source.get("ref")
+            runtime_ref = unknown.get("ui_runtime_ref")
+            if source_ref not in self.ui_runtime_ids:
+                self.error(f"Runtime Unknown {unknown.get('id')} source.ref is not a runtime-required ID: {source_ref}")
+            if runtime_ref not in self.ui_runtime_ids:
+                self.error(f"Runtime Unknown {unknown.get('id')} ui_runtime_ref is not a runtime-required ID: {runtime_ref}")
+
+    def check_runtime_enrichment(self, intent: dict) -> None:
+        enrichment = intent.get("runtime_enrichment")
+        stage = intent.get("lifecycle", {}).get("stage") if isinstance(intent.get("lifecycle"), dict) else None
+        if enrichment is not None and stage == "PRE_RUNTIME":
+            self.error("PRE_RUNTIME Intent must omit runtime_enrichment")
+        if enrichment:
+            if stage != "RUNTIME_ENRICHED":
+                self.error("runtime_enrichment requires lifecycle.stage RUNTIME_ENRICHED")
+            source_types = self._source_types(intent)
+            if "RUNTIME_OBSERVATION" not in source_types:
+                self.error("runtime_enrichment requires an explicit RUNTIME_OBSERVATION source")
+
+    def _source_types(self, node: object) -> set[str]:
+        result: set[str] = set()
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in {"source", "source_refs", "basis"}:
+                    values = value if isinstance(value, list) else [value]
+                    for item in values:
+                        if isinstance(item, dict) and isinstance(item.get("type"), str):
+                            result.add(item["type"])
+                result.update(self._source_types(value))
+        elif isinstance(node, list):
+            for value in node:
+                result.update(self._source_types(value))
+        return result
+
+    def check_runtime_unknown_business_conflicts(self, intent: dict) -> None:
+        business_texts: list[str] = []
+        goal = intent.get("goal", {})
+        if isinstance(goal, dict):
+            expected = goal.get("expected_business_result", [])
+            if isinstance(expected, list):
+                business_texts.extend(str(item) for item in expected)
+        for assertion in intent.get("assertions", []) or []:
+            if not isinstance(assertion, dict):
+                continue
+            target = assertion.get("target", {})
+            expected = assertion.get("expected", {})
+            if isinstance(target, dict):
+                business_texts.append(str(target.get("semantic_name", "")))
+            if isinstance(expected, dict):
+                for key in ("semantic_name", "text", "value"):
+                    if isinstance(expected.get(key), str):
+                        business_texts.append(expected[key])
+        tokens: set[str] = set()
+        for text_value in business_texts:
+            tokens.update(re.findall(r"[\u4e00-\u9fff]{3,}|[A-Za-z][A-Za-z0-9_ -]{3,}", text_value))
+        for unknown in intent.get("runtime_unknowns", []) or []:
+            if not isinstance(unknown, dict) or not isinstance(unknown.get("question"), str):
+                continue
+            question = unknown["question"]
+            conflicts = [token for token in tokens if token and token in question]
+            if conflicts:
+                self.runtime_unknown_business_assertion_conflicts += 1
+                self.error(
+                    f"Runtime Unknown {unknown.get('id')} restates business assertion text: {', '.join(sorted(conflicts))}"
+                )
 
     def check_lifecycle(self, lifecycle: object) -> None:
         if not isinstance(lifecycle, dict):
@@ -375,6 +606,11 @@ class Validator:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path", type=Path)
+    parser.add_argument(
+        "--ui-knowledge-root",
+        type=Path,
+        help="optional ui-knowledge directory; otherwise resolve beside the Intent or current directory",
+    )
     args = parser.parse_args()
     try:
         document = yaml.safe_load(args.path.read_text(encoding="utf-8"))
@@ -384,8 +620,20 @@ def main() -> int:
     except yaml.YAMLError as exc:
         print(f"ERROR: invalid YAML: {exc}", file=sys.stderr)
         return 2
-    validator = Validator(document)
+    validator = Validator(document, intent_path=args.path, ui_knowledge_root=args.ui_knowledge_root)
     validator.check()
+    for warning in validator.warnings:
+        print(f"WARNING: {warning}")
+    print(
+        "SUMMARY: "
+        f"ui_knowledge_available={str(validator.ui_knowledge_available).lower()} "
+        f"ui_knowledge_refs_resolved={validator.ui_refs_resolved} "
+        f"ui_knowledge_refs_unresolved={validator.ui_refs_unresolved} "
+        f"pseudo_reference_count={validator.pseudo_reference_count} "
+        f"runtime_unknown_business_assertion_conflicts={validator.runtime_unknown_business_assertion_conflicts} "
+        "automation_asset_reads=0 "
+        f"lifecycle_stage={document.get('intent', {}).get('lifecycle', {}).get('stage') if isinstance(document, dict) and isinstance(document.get('intent'), dict) else 'UNKNOWN'}"
+    )
     if validator.errors:
         for error in validator.errors:
             print(f"ERROR: {error}")
