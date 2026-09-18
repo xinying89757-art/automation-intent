@@ -1,0 +1,7 @@
+interface:
+  display_name: "Automation Intent"
+  short_description: "Build traceable UI automation intent YAML"
+  default_prompt: "Use $automation-intent to generate a PRE_RUNTIME automation-intent.yaml from the supplied Test Case, PRD, Prototype, and ui-knowledge; do not match assets or generate Locators."
+
+policy:
+  allow_implicit_invocation: true

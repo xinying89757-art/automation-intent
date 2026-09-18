@@ -1,0 +1,493 @@
+schema_version: "1.0"
+
+intent:
+  id: "AI-CUSTOMER-001"
+
+  lifecycle:
+    stage: PRE_RUNTIME
+    status: READY_FOR_MATCHING
+
+  case:
+    id: "CUSTOMER-001"
+    name: "修改客户负责人"
+    module: "客户管理"
+    source_refs:
+      - type: TEST_CASE
+        ref: "CUSTOMER-001"
+      - type: PRD
+        ref: "客户管理 / 修改负责人"
+    priority: P1
+
+  eligibility:
+    status: ELIGIBLE
+    reasons:
+      - "核心操作和业务结果均可通过用户可见 UI 验证"
+    excluded_points: []
+
+  goal:
+    actor:
+      semantic_name: "客户管理员"
+    action:
+      semantic_name: "修改"
+    object:
+      semantic_name: "客户负责人"
+    expected_business_result:
+      - "目标客户的负责人变更为指定员工"
+
+  test_data:
+    variables:
+      - id: customer_name
+        semantic_name: "目标客户"
+        type: STRING
+        required: true
+        value: null
+        source:
+          type: TEST_CASE
+          ref: "CUSTOMER-001"
+          description: "测试数据提供目标客户名称"
+        sensitivity: NORMAL
+
+      - id: target_employee
+        semantic_name: "目标员工"
+        type: STRING
+        required: true
+        value: null
+        source:
+          type: TEST_CASE
+          ref: "CUSTOMER-001"
+          description: "测试数据提供可选择的目标员工"
+        sensitivity: NORMAL
+
+  preconditions:
+    - id: PRE-01
+      statement: "当前账号拥有客户负责人编辑权限"
+      knowledge_level: CONFIRMED
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+    - id: PRE-02
+      statement: "系统中存在目标客户"
+      knowledge_level: CONFIRMED
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+    - id: PRE-03
+      statement: "系统中存在可选择的目标员工"
+      knowledge_level: CONFIRMED
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+
+  ui_context:
+    entry:
+      semantic_path:
+        - "客户管理"
+        - "客户详情"
+        - "基本信息"
+        - "负责人编辑"
+        - "员工选择"
+        - "保存"
+      knowledge_refs:
+        - "page-customer-management"
+        - "page-customer-detail"
+        - "component-employee-selector"
+        - "runtime-owner-editor-entry"
+    target_page:
+      semantic_name: "客户详情"
+      knowledge_ref: "page-customer-detail"
+      resolution_status: RESOLVED
+    target_region:
+      semantic_name: "基本信息"
+      knowledge_ref: "region-customer-basic-info"
+      resolution_status: PARTIALLY_RESOLVED
+    related_components:
+      - semantic_name: "员工选择器"
+        knowledge_ref: "component-employee-selector"
+        role: UI_SURFACE
+
+  steps:
+    - id: S1
+      intent: "打开目标客户详情"
+      context:
+        page:
+          semantic_name: "客户管理"
+          knowledge_ref: "page-customer-management"
+        region:
+          semantic_name: "客户列表"
+          knowledge_ref: "region-customer-list"
+      anchor:
+        primary:
+          semantic_name: "目标客户"
+          value_ref: "${customer_name}"
+        secondary: []
+      target:
+        semantic_name: "客户详情入口"
+        expected_type: LINK_OR_ROW_ACTION
+        knowledge_ref: null
+      action:
+        type: OPEN
+        value_ref: null
+      expected_transition:
+        - type: PAGE_OR_REGION_VISIBLE
+          semantic_target: "客户详情"
+      required_capability_refs:
+        - CAP-01
+      runtime_unknown_refs: []
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+
+    - id: S2
+      intent: "打开负责人编辑入口"
+      context:
+        page:
+          semantic_name: "客户详情"
+          knowledge_ref: "page-customer-detail"
+        region:
+          semantic_name: "基本信息"
+          knowledge_ref: "region-customer-basic-info"
+      anchor:
+        primary:
+          semantic_name: "负责人"
+        secondary: []
+      target:
+        semantic_name: "负责人编辑入口"
+        expected_type: BUTTON_OR_ICON
+        knowledge_ref: "runtime-owner-editor-entry"
+      action:
+        type: CLICK
+        value_ref: null
+      expected_transition:
+        - type: EDITOR_VISIBLE
+          semantic_target: "负责人编辑界面"
+      required_capability_refs:
+        - CAP-02
+      runtime_unknown_refs:
+        - RU-01
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+
+    - id: S3
+      intent: "在员工选择器中选择目标员工"
+      context:
+        page:
+          semantic_name: "客户详情"
+          knowledge_ref: "page-customer-detail"
+        region:
+          semantic_name: "负责人编辑界面"
+          knowledge_ref: "runtime-owner-editor-entry"
+      anchor:
+        primary:
+          semantic_name: "负责人"
+        secondary: []
+      target:
+        semantic_name: "员工选择器"
+        expected_type: SELECTOR
+        knowledge_ref: "component-employee-selector"
+      action:
+        type: SELECT
+        value_ref: "${target_employee}"
+      expected_transition:
+        - type: FIELD_VALUE_CHANGED
+          semantic_target: "负责人"
+          expected_ref: "${target_employee}"
+      required_capability_refs:
+        - CAP-03
+      runtime_unknown_refs:
+        - RU-02
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+
+    - id: S4
+      intent: "保存负责人修改"
+      context:
+        page:
+          semantic_name: "客户详情"
+          knowledge_ref: "page-customer-detail"
+        region:
+          semantic_name: "负责人编辑界面"
+          knowledge_ref: "runtime-owner-editor-entry"
+      anchor:
+        primary:
+          semantic_name: "负责人"
+        secondary: []
+      target:
+        semantic_name: "保存"
+        expected_type: BUTTON
+        knowledge_ref: null
+      action:
+        type: SAVE
+        value_ref: null
+      expected_transition:
+        - type: CHANGE_COMMITTED
+          semantic_target: "负责人修改"
+      required_capability_refs:
+        - CAP-04
+      runtime_unknown_refs:
+        - RU-03
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+
+    - id: S5
+      intent: "验证目标客户负责人已变更为目标员工"
+      context:
+        page:
+          semantic_name: "客户详情"
+          knowledge_ref: "page-customer-detail"
+        region:
+          semantic_name: "基本信息"
+          knowledge_ref: "region-customer-basic-info"
+      anchor:
+        primary:
+          semantic_name: "负责人"
+        secondary: []
+      target:
+        semantic_name: "客户负责人字段"
+        expected_type: FIELD
+        knowledge_ref: null
+      action:
+        type: ASSERT
+        value_ref: "${target_employee}"
+      expected_transition:
+        - type: BUSINESS_RESULT_VISIBLE
+          semantic_target: "负责人已变更"
+      required_capability_refs:
+        - CAP-05
+      runtime_unknown_refs:
+        - RU-03
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+
+  required_capabilities:
+    - id: CAP-01
+      capability: navigate_to_customer_detail
+      semantic_name: "打开客户详情"
+      category: NAVIGATION
+      required: true
+      step_refs:
+        - S1
+      preferred_asset_types:
+        - business_action
+        - page_object
+      ui_knowledge_refs:
+        - "page-customer-management"
+        - "page-customer-detail"
+
+    - id: CAP-02
+      capability: open_customer_owner_editor
+      semantic_name: "打开负责人编辑入口"
+      category: BUSINESS_ACTION
+      required: true
+      step_refs:
+        - S2
+      preferred_asset_types:
+        - business_action
+        - page_object
+      ui_knowledge_refs:
+        - "page-customer-detail"
+        - "runtime-owner-editor-entry"
+
+    - id: CAP-03
+      capability: select_employee
+      semantic_name: "选择员工"
+      category: UI_INTERACTION
+      required: true
+      step_refs:
+        - S3
+      preferred_asset_types:
+        - business_action
+        - ui_component
+      ui_knowledge_refs:
+        - "component-employee-selector"
+
+    - id: CAP-04
+      capability: save_owner_change
+      semantic_name: "保存负责人修改"
+      category: BUSINESS_ACTION
+      required: true
+      step_refs:
+        - S4
+      preferred_asset_types:
+        - business_action
+      ui_knowledge_refs:
+        - "page-customer-detail"
+
+    - id: CAP-05
+      capability: assert_customer_owner_changed
+      semantic_name: "验证负责人已修改"
+      category: ASSERTION
+      required: true
+      step_refs:
+        - S5
+      preferred_asset_types:
+        - assertion
+      ui_knowledge_refs:
+        - "page-customer-detail"
+
+  assertions:
+    - id: A-01
+      type: FIELD_VALUE
+      target:
+        semantic_name: "负责人"
+        knowledge_ref: null
+      expected:
+        value_ref: "${target_employee}"
+      required_capability_ref: CAP-05
+      required: true
+      source_refs:
+        - type: TEST_CASE
+          ref: "CUSTOMER-001"
+
+    - id: A-02
+      type: BUSINESS_RESULT
+      target:
+        semantic_name: "客户负责人"
+        knowledge_ref: null
+      expected:
+        semantic_name: "已变更为目标员工"
+        value_ref: "${target_employee}"
+      required_capability_ref: CAP-05
+      required: true
+      source_refs:
+        - type: PRD
+          ref: "客户管理 / 修改负责人"
+
+  knowledge:
+    confirmed:
+      - id: K-01
+        fact: "系统支持修改客户负责人"
+        source_refs:
+          - type: PRD
+            ref: "客户管理 / 修改负责人"
+      - id: K-02
+        fact: "目标客户和目标员工由测试数据提供"
+        source_refs:
+          - type: TEST_CASE
+            ref: "CUSTOMER-001"
+    inferred:
+      - id: K-03
+        fact: "负责人编辑入口可能表现为按钮或图标"
+        confidence: medium
+        basis:
+          - type: PROTOTYPE
+            ref: "客户详情原型"
+          - type: UI_PROFILE
+            ref: "page-customer-detail"
+        must_not_be_treated_as_confirmed: true
+    ui_profile_refs:
+      pages:
+        - "page-customer-management"
+        - "page-customer-detail"
+      components:
+        - "component-employee-selector"
+      interaction_rules:
+        - "rule-customer-owner-edit"
+      permissions:
+        - "permission-customer-edit"
+      runtime_refs:
+        - "runtime-owner-editor-entry"
+        - "runtime-employee-selector-search"
+        - "runtime-owner-save-result"
+
+  runtime_unknowns:
+    - id: RU-01
+      question: "编辑入口在真实页面中是按钮、图标还是其他可见入口？"
+      category: TARGET_RESOLUTION
+      blocking: true
+      priority: P1
+      applies_to:
+        steps:
+          - S2
+        capabilities:
+          - CAP-02
+      source:
+        type: UI_PROFILE_RUNTIME_REQUIRED
+        ref: "runtime-owner-editor-entry"
+      ui_runtime_ref: "runtime-owner-editor-entry"
+      preferred_resolution: UI_EXPLORATION
+      status: OPEN
+
+    - id: RU-02
+      question: "员工选择器是否支持按员工名称搜索，以及搜索结果如何确认？"
+      category: INTERACTION_BEHAVIOR
+      blocking: true
+      priority: P1
+      applies_to:
+        steps:
+          - S3
+        capabilities:
+          - CAP-03
+      source:
+        type: UI_PROFILE_RUNTIME_REQUIRED
+        ref: "runtime-employee-selector-search"
+      ui_runtime_ref: "runtime-employee-selector-search"
+      preferred_resolution: HUMAN_DEMO
+      status: OPEN
+
+    - id: RU-03
+      question: "保存后编辑界面如何关闭，业务成功如何在真实页面中确认？"
+      category: POST_ACTION_BEHAVIOR
+      blocking: true
+      priority: P1
+      applies_to:
+        steps:
+          - S4
+          - S5
+        capabilities:
+          - CAP-04
+          - CAP-05
+      source:
+        type: UI_PROFILE_RUNTIME_REQUIRED
+        ref: "runtime-owner-save-result"
+      ui_runtime_ref: "runtime-owner-save-result"
+      preferred_resolution: UI_EXPLORATION
+      status: OPEN
+
+  automation_constraints:
+    locator_policy:
+      prefer:
+        - verified_semantic_asset
+        - data_testid
+        - role_and_accessible_name
+        - label
+        - semantic_relative_locator
+      avoid:
+        - nth
+        - complex_xpath
+        - dom_depth_css
+        - dynamic_class
+    timing_policy:
+      avoid:
+        - fixed_sleep
+      prefer:
+        - visible_state
+        - enabled_state
+        - url_state
+        - response_state
+        - application_state
+    behavior_policy:
+      - "不得修改业务预期以让自动化通过"
+      - "未确认的交互不得作为确定事实执行"
+      - "存在歧义时优先 Runtime Exploration"
+      - "低置信度目标不得通过猜测点击"
+      - "产品行为与预期不一致时不得自动修改 Assertion"
+
+  validation:
+    ready_for_asset_matching: true
+    checks:
+      - id: V-01
+        name: "核心业务目标明确"
+        status: PASS
+      - id: V-02
+        name: "所有必需 Step 均引用 Required Capability"
+        status: PASS
+      - id: V-03
+        name: "核心业务 Assertion 可追溯"
+        status: PASS
+    blocking_issues: []
+    conflicts: []
+    warnings: []
