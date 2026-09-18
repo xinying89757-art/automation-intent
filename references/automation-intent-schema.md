@@ -13,7 +13,8 @@ Test Case / PRD / Prototype / UI Knowledge
 ```
 
 The Intent records what must be done and verified. It does not choose how an existing
-automation asset will implement it.
+automation asset will implement it. `ui-knowledge/` is a formal semantic evidence input;
+`automation-assets/` is deliberately outside this document's input boundary.
 
 ## 1. Top-level shape
 
@@ -154,7 +155,10 @@ Allowed `knowledge_level` values are exactly:
 `CONFIRMED`, `INFERRED`, `RUNTIME_UNKNOWN`, `HUMAN_CONFIRMED`, `RUNTIME_VERIFIED`.
 
 Use `RUNTIME_UNKNOWN` when the precondition is necessary but not established. Do not
-silently turn a code fact into a business precondition.
+silently turn a code fact into a business precondition. If the Test Case explicitly says
+to prepare a target product, account, password, or other fixture, the existence of that
+precondition is `CONFIRMED` from `TEST_CASE`; an unresolved concrete identifier is a
+test-data warning, not a reason to downgrade the whole precondition.
 
 ## 6. UI Context
 
@@ -185,6 +189,19 @@ ui_context:
 flow. `target_page` and `target_region` use `semantic_name`, `knowledge_ref`, and
 `resolution_status`. `related_components` may include only evidence-backed semantic
 components; an `INFRASTRUCTURE` role is not a default UI Target.
+
+Resolve UI references by searching `ui-match-index.yaml` first and then confirming the
+match in the relevant detailed profile file. When a real match exists, preserve its exact
+Knowledge ID in every applicable `knowledge_ref`, `ui_knowledge_refs`, and
+`knowledge.ui_profile_refs` field. A non-null reference must resolve to an ID in the
+supplied `ui-knowledge/`; IDs derived from an Intent, Step, Capability, or Runtime
+Unknown are invalid. A variant whose `activation` is `RUNTIME_REQUIRED` remains runtime
+dependent and cannot be used as an unconditional system fact.
+
+When `ui-knowledge/` is unavailable, generation may continue, but all UI
+`knowledge_ref`/`ui_runtime_ref` fields must be `null` and `validation.warnings` must
+include `UI_KNOWLEDGE_NOT_AVAILABLE`. The absence itself is a warning, not a reason to
+invent a pseudo-reference.
 
 Allowed `resolution_status` values are `RESOLVED`, `PARTIALLY_RESOLVED`, and
 `UNRESOLVED`.
@@ -270,6 +287,12 @@ required_capabilities:
 
 Each item has at least `id`, `capability`, `semantic_name`, `category`, `required`,
 `step_refs`, `preferred_asset_types`, and `ui_knowledge_refs`.
+
+Capabilities are reusable semantic units, not a one-to-one copy of UI micro-steps.
+Consecutive, tightly coupled actions may share one capability, for example selecting a
+custom URL, filling its path, and saving it as `configure_product_custom_url`, or
+selecting password access, filling the secret, and saving it as
+`configure_password_access`. Do not collapse an entire Case into one capability.
 
 Allowed `category` values:
 
@@ -379,6 +402,20 @@ Required fields are `id`, `question`, `category`, `blocking`, `priority`,
 `applies_to.steps`, `applies_to.capabilities`, `source`, `ui_runtime_ref`,
 `preferred_resolution`, and `status`.
 
+Runtime Unknowns describe implementation or runtime mechanics only. A business result
+already stated by the Test Case or PRD—such as showing a password page, hiding product
+content before verification, or showing product content after correct verification—must
+remain a business Assertion and must not be restated as an unknown. Valid questions ask
+about presentation, entry/control semantics, navigation/refresh/async behavior,
+DOM/overlay/iframe behavior, or another implementation detail.
+
+If `source.type` is `UI_PROFILE_RUNTIME_REQUIRED`, both `source.ref` and
+`ui_runtime_ref` must be the exact ID of a real `ui-knowledge/runtime-required.yaml`
+record. If the question is inferred only from a Test Case or Prototype and no matching
+UI Profile runtime record exists, use `source.type: TEST_CASE` or `PROTOTYPE` and set
+`ui_runtime_ref: null`. Never use pseudo IDs such as `product-page-settings-entry` or an
+Intent-local ID such as `RU-01` as a UI runtime reference.
+
 Allowed `category` values:
 
 `PAGE_RESOLUTION`, `TARGET_RESOLUTION`, `INTERACTION_BEHAVIOR`, `DATA_BEHAVIOR`,
@@ -477,9 +514,19 @@ Set `ready_for_asset_matching: true` only when all are true:
 Runtime Unknowns may remain. A blocking Runtime Unknown means “resolve before this
 Step executes,” not “do not generate Intent” and not necessarily “do not match assets.”
 
+The validator must also check that every non-null `knowledge_ref` and `ui_runtime_ref`
+resolves to a real ID in `ui-knowledge/`. An unresolved or pseudo-reference is a
+validation failure. If `ui-knowledge/` is absent, emit `UI_KNOWLEDGE_NOT_AVAILABLE`; do
+not fail a fully degraded Intent solely for that absence, provided it contains no
+non-null UI references.
+
 `validation.blocking_issues` and `validation.conflicts` are the designated place to
 record unresolved requirement/source disagreements. `validation.warnings` records
 non-blocking data quality issues such as an English-only `business_terms.zh` region.
+
+`eligibility.excluded_points` contains only test points explicitly excluded from
+automation. Do not put Skill responsibilities such as “no Locator generation” or “no
+asset matching” there; use `[]` when no source test point is excluded.
 
 ## 15. Runtime enrichment extension
 
@@ -498,6 +545,12 @@ The extension may record `runtime_unknown_ref`, `status: RESOLVED`, observed sem
 type/behavior, and `evidence_ref`. It must not write CSS/XPath/`nth`/`locator(...)` back
 into the Intent.
 
+This extension is allowed only when an independent Runtime Observation was explicitly
+provided as input. A PRE_RUNTIME Intent must omit `runtime_enrichment`; when enrichment
+is produced, `intent.lifecycle.stage` must be `RUNTIME_ENRICHED` and the evidence must
+trace to `RUNTIME_OBSERVATION`. Historical reports or anything reachable through
+`automation-assets/` do not qualify.
+
 ## 16. Idempotency and preservation
 
 When an existing Intent is updated, match by stable `intent.id` or `case.id`. Preserve
@@ -513,5 +566,25 @@ The following fields belong to the future Asset Matcher and must not occur in an
 `matched_asset`, `selected_asset`, `reuse_readiness`, `effective_reuse_readiness`,
 `dependency_closure`, `reuse-plan`.
 
+The Intent must not read or cite `automation-assets/`, `match-index.yaml`,
+`dependency-index.yaml`, historical Playwright registries, or historical run reports
+reachable only through those assets. In particular, it must not contain an
+`automation-assets/...` evidence reference.
+
 An Intent also must not contain final Locator syntax, Playwright code, or a concrete
 automation asset selection.
+
+## 18. Intent Summary
+
+The post-generation report includes the normal case/step/capability/assertion and
+readiness counts plus these boundary checks:
+
+```text
+ui_knowledge_available: true|false
+ui_knowledge_refs_resolved: <count>
+ui_knowledge_refs_unresolved: <count>
+pseudo_reference_count: 0
+runtime_unknown_business_assertion_conflicts: 0
+automation_asset_reads: 0
+lifecycle_stage: PRE_RUNTIME|RUNTIME_ENRICHED|FINALIZED
+```
