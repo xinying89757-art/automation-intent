@@ -294,6 +294,16 @@ custom URL, filling its path, and saving it as `configure_product_custom_url`, o
 selecting password access, filling the secret, and saving it as
 `configure_password_access`. Do not collapse an entire Case into one capability.
 
+`preferred_asset_types` must use only the canonical Automation Asset Registry values:
+
+`auth`, `business_action`, `assertion`, `wait_strategy`, `ui_component`,
+`locator_strategy`, `fixture`, `test_data`, `environment_helper`, `business_flow`,
+`page_object`, `runtime_helper`, `state_manager`.
+
+Normalize `environment_setup` to `environment_helper` and `assertion_helper` to
+`assertion`; do not introduce synonyms. These are static shared type labels, not
+selected assets and not permission to read `automation-assets/`.
+
 Allowed `category` values:
 
 `AUTH`, `NAVIGATION`, `STATE_SETUP`, `TEST_DATA`, `UI_TARGET`, `UI_INTERACTION`,
@@ -409,6 +419,13 @@ remain a business Assertion and must not be restated as an unknown. Valid questi
 about presentation, entry/control semantics, navigation/refresh/async behavior,
 DOM/overlay/iframe behavior, or another implementation detail.
 
+If the source already asserts that a page appears, a field is shown, an option is
+selected, content is hidden, saving succeeds, or content is displayed after verification,
+do not ask Runtime Unknown questions such as “是否出现？/是否选中？/是否保存成功？/
+是否隐藏？/是否展示？”. For TC_PD_001, ask “页面设置入口在真实 UI 中以什么控件形式
+出现，以及如何识别‘基础设置’当前选中状态？” and “选择‘密码访问’后，密码输入控件以
+什么 UI 类型呈现，其可编辑状态和交互方式如何识别？”.
+
 If `source.type` is `UI_PROFILE_RUNTIME_REQUIRED`, both `source.ref` and
 `ui_runtime_ref` must be the exact ID of a real `ui-knowledge/runtime-required.yaml`
 record. If the question is inferred only from a Test Case or Prototype and no matching
@@ -519,6 +536,11 @@ resolves to a real ID in `ui-knowledge/`. An unresolved or pseudo-reference is a
 validation failure. If `ui-knowledge/` is absent, emit `UI_KNOWLEDGE_NOT_AVAILABLE`; do
 not fail a fully degraded Intent solely for that absence, provided it contains no
 non-null UI references.
+
+Do not silently pass when `pseudo_reference_count > 0`,
+`runtime_unknown_business_assertion_conflicts > 0`, `automation_asset_reads > 0`, or
+when available `ui-knowledge` clearly matches the business semantics but all related
+UI references remain null.
 
 `validation.blocking_issues` and `validation.conflicts` are the designated place to
 record unresolved requirement/source disagreements. `validation.warnings` records
