@@ -121,7 +121,7 @@ intent:
       action: {type: OPEN, value_ref: null}
       expected_transition:
         - {type: PAGE_OR_REGION_VISIBLE, semantic_target: "目标产品编辑页"}
-      required_capability_refs: [CAP-01]
+      required_capability_refs: [CAP-01, CAP-02]
       runtime_unknown_refs: [RU-01]
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
     - id: S2
@@ -139,7 +139,7 @@ intent:
       action: {type: SAVE, value_ref: "${custom_product_path}"}
       expected_transition:
         - {type: CONFIGURATION_SAVED, semantic_target: "产品自定义URL"}
-      required_capability_refs: [CAP-02]
+      required_capability_refs: [CAP-03]
       runtime_unknown_refs: [RU-02]
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
     - id: S3
@@ -157,7 +157,7 @@ intent:
       action: {type: OPEN, value_ref: null}
       expected_transition:
         - {type: REGION_VISIBLE, semantic_target: "访问权限区域"}
-      required_capability_refs: [CAP-03]
+      required_capability_refs: [CAP-04]
       runtime_unknown_refs: [RU-03]
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
     - id: S4
@@ -175,7 +175,7 @@ intent:
       action: {type: SAVE, value_ref: "${page_access_password}"}
       expected_transition:
         - {type: CONFIGURATION_SAVED, semantic_target: "页面密码访问"}
-      required_capability_refs: [CAP-04]
+      required_capability_refs: [CAP-05]
       runtime_unknown_refs: [RU-04]
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
     - id: S5
@@ -193,7 +193,7 @@ intent:
       action: {type: OPEN, value_ref: "${custom_product_path}"}
       expected_transition:
         - {type: PAGE_OR_REGION_VISIBLE, semantic_target: "密码输入页"}
-      required_capability_refs: [CAP-05]
+      required_capability_refs: [CAP-06]
       runtime_unknown_refs: [RU-05]
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
     - id: S6
@@ -211,7 +211,7 @@ intent:
       action: {type: SUBMIT, value_ref: "${page_access_password}"}
       expected_transition:
         - {type: CONTENT_ACCESS_GRANTED, semantic_target: "产品内容"}
-      required_capability_refs: [CAP-06]
+      required_capability_refs: [CAP-08]
       runtime_unknown_refs: [RU-06]
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
     - id: S7
@@ -247,17 +247,19 @@ intent:
       action: {type: ASSERT, value_ref: null}
       expected_transition:
         - {type: BUSINESS_RESULT_VISIBLE, semantic_target: "产品内容可见"}
-      required_capability_refs: [CAP-07]
+      required_capability_refs: [CAP-09]
       runtime_unknown_refs: [RU-06]
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
   required_capabilities:
-    - {id: CAP-01, capability: navigate_to_product_editor, semantic_name: "进入目标产品编辑页", category: NAVIGATION, required: true, step_refs: [S1], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-module-navigation]}
-    - {id: CAP-02, capability: configure_product_custom_url, semantic_name: "配置并保存产品自定义URL", category: BUSINESS_ACTION, required: true, step_refs: [S2], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-product-url-editor]}
-    - {id: CAP-03, capability: open_product_page_settings, semantic_name: "打开产品页面设置基础设置", category: NAVIGATION, required: true, step_refs: [S3], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-page-settings-panel]}
-    - {id: CAP-04, capability: configure_password_access, semantic_name: "配置并保存密码访问", category: BUSINESS_ACTION, required: true, step_refs: [S4], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [component-page-settings-panel, component-password-access-control]}
-    - {id: CAP-05, capability: open_protected_product_url_incognito, semantic_name: "在无痕未登录状态打开受保护产品URL", category: ENVIRONMENT, required: true, step_refs: [S5], preferred_asset_types: [business_action, browser_session], ui_knowledge_refs: [page-prod, runtime-password-page-presentation]}
-    - {id: CAP-06, capability: submit_product_page_password, semantic_name: "提交产品页面访问密码", category: AUTH, required: true, step_refs: [S6], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [component-password-gate, runtime-password-verification-transition]}
-    - {id: CAP-07, capability: assert_product_password_access_states, semantic_name: "验证密码保护前后产品内容状态", category: ASSERTION, required: true, step_refs: [S7, S8], preferred_asset_types: [assertion, page_object], ui_knowledge_refs: [page-prod, component-password-gate]}
+    - {id: CAP-01, capability: navigate_to_product_management, semantic_name: "进入产品管理", category: NAVIGATION, required: true, step_refs: [S1], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-module-navigation]}
+    - {id: CAP-02, capability: open_target_product_editor, semantic_name: "打开目标产品编辑页", category: NAVIGATION, required: true, step_refs: [S1], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod]}
+    - {id: CAP-03, capability: configure_product_custom_url, semantic_name: "配置并保存产品自定义URL", category: BUSINESS_ACTION, required: true, step_refs: [S2], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-product-url-editor]}
+    - {id: CAP-04, capability: open_product_page_settings, semantic_name: "打开产品页面设置基础设置", category: NAVIGATION, required: true, step_refs: [S3], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-page-settings-panel]}
+    - {id: CAP-05, capability: configure_password_access, semantic_name: "配置并保存密码访问", category: BUSINESS_ACTION, required: true, step_refs: [S4], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [component-page-settings-panel, component-password-access-control]}
+    - {id: CAP-06, capability: open_product_custom_url_in_clean_browser, semantic_name: "在无痕未登录状态打开受保护产品URL", category: ENVIRONMENT, required: true, step_refs: [S5], preferred_asset_types: [environment_helper, business_action], ui_knowledge_refs: [page-prod, runtime-password-page-presentation]}
+    - {id: CAP-07, capability: assert_password_gate_state, semantic_name: "验证密码保护页状态", category: ASSERTION, required: true, step_refs: [S7], preferred_asset_types: [assertion, page_object], ui_knowledge_refs: [page-prod, component-password-gate]}
+    - {id: CAP-08, capability: complete_frontend_password_verification, semantic_name: "完成前台密码验证", category: AUTH, required: true, step_refs: [S6], preferred_asset_types: [auth, business_action], ui_knowledge_refs: [component-password-gate, runtime-password-verification-transition]}
+    - {id: CAP-09, capability: assert_product_detail_content_visible, semantic_name: "验证产品详情内容可见", category: ASSERTION, required: true, step_refs: [S8], preferred_asset_types: [assertion, page_object], ui_knowledge_refs: [page-prod]}
   assertions:
     - id: A-01
       type: PAGE_STATE
@@ -277,7 +279,7 @@ intent:
       type: VISIBILITY
       target: {semantic_name: "产品内容", knowledge_ref: page-prod}
       expected: {value: true, semantic_name: "正确密码验证后产品内容可见"}
-      required_capability_ref: CAP-07
+      required_capability_ref: CAP-09
       required: true
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
   knowledge:
@@ -298,7 +300,7 @@ intent:
       category: PAGE_RESOLUTION
       blocking: true
       priority: P1
-      applies_to: {steps: [S1], capabilities: [CAP-01]}
+      applies_to: {steps: [S1], capabilities: [CAP-01, CAP-02]}
       source: {type: UI_PROFILE_RUNTIME_REQUIRED, ref: runtime-navigation-controller-resolution}
       ui_runtime_ref: runtime-navigation-controller-resolution
       preferred_resolution: UI_EXPLORATION
@@ -308,27 +310,27 @@ intent:
       category: INTERACTION_BEHAVIOR
       blocking: true
       priority: P1
-      applies_to: {steps: [S2], capabilities: [CAP-02]}
+      applies_to: {steps: [S2], capabilities: [CAP-03]}
       source: {type: UI_PROFILE_RUNTIME_REQUIRED, ref: runtime-custom-url-save-transition}
       ui_runtime_ref: runtime-custom-url-save-transition
       preferred_resolution: UI_EXPLORATION
       status: OPEN
     - id: RU-03
-      question: "页面设置在真实页面中以弹层、抽屉还是其他承载方式出现？"
+      question: "页面设置入口在真实 UI 中以什么控件形式出现，以及如何识别“基础设置”当前选中状态？"
       category: OVERLAY_BEHAVIOR
       blocking: true
       priority: P1
-      applies_to: {steps: [S3], capabilities: [CAP-03]}
+      applies_to: {steps: [S3], capabilities: [CAP-04]}
       source: {type: UI_PROFILE_RUNTIME_REQUIRED, ref: runtime-page-settings-entry}
       ui_runtime_ref: runtime-page-settings-entry
       preferred_resolution: UI_EXPLORATION
       status: OPEN
     - id: RU-04
-      question: "密码访问配置保存后，页面设置的关闭、刷新或异步生效方式是什么？"
+      question: "选择“密码访问”后，密码输入控件以什么 UI 类型呈现，其可编辑状态和交互方式如何识别？"
       category: POST_ACTION_BEHAVIOR
       blocking: true
       priority: P1
-      applies_to: {steps: [S4], capabilities: [CAP-04]}
+      applies_to: {steps: [S4], capabilities: [CAP-05]}
       source: {type: UI_PROFILE_RUNTIME_REQUIRED, ref: runtime-popup-mount-and-obscuration}
       ui_runtime_ref: runtime-popup-mount-and-obscuration
       preferred_resolution: UI_EXPLORATION
@@ -338,7 +340,7 @@ intent:
       category: PAGE_RESOLUTION
       blocking: true
       priority: P1
-      applies_to: {steps: [S5], capabilities: [CAP-05]}
+      applies_to: {steps: [S5], capabilities: [CAP-06]}
       source: {type: UI_PROFILE_RUNTIME_REQUIRED, ref: runtime-password-page-presentation}
       ui_runtime_ref: runtime-password-page-presentation
       preferred_resolution: UI_EXPLORATION
@@ -348,7 +350,7 @@ intent:
       category: POST_ACTION_BEHAVIOR
       blocking: true
       priority: P1
-      applies_to: {steps: [S6, S8], capabilities: [CAP-06, CAP-07]}
+      applies_to: {steps: [S6, S8], capabilities: [CAP-08, CAP-09]}
       source: {type: UI_PROFILE_RUNTIME_REQUIRED, ref: runtime-password-verification-transition}
       ui_runtime_ref: runtime-password-verification-transition
       preferred_resolution: UI_EXPLORATION
