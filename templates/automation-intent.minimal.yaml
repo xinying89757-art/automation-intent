@@ -1,6 +1,8 @@
 # Draft scaffold. Fill evidence-backed fields before setting ready_for_asset_matching: true.
 # If no ui-knowledge/ is supplied, keep every knowledge_ref/ui_runtime_ref null and keep
 # the explicit UI_KNOWLEDGE_NOT_AVAILABLE warning below. Never invent profile IDs.
+# Required Capabilities must use only canonical preferred_asset_types such as
+# business_action, assertion, environment_helper, page_object, and runtime_helper.
 schema_version: "1.0"
 
 intent:
