@@ -148,8 +148,20 @@ Do not treat a variant rule whose activation is `RUNTIME_REQUIRED` as unconditio
 `ui-knowledge/` is a formal input, not optional decoration. The preferred lookup order
 is `ui-match-index.yaml` → the matching page/component/rule/permission records → the
 matching `runtime-required.yaml` record. When a match exists, retain the real ID in all
-applicable UI context, capability, and knowledge reference fields. Never manufacture an
-ID from a Step, Capability, Intent, or Runtime Unknown ID (for example `RU-01`).
+applicable UI context, capability, and knowledge reference fields, but first classify the
+match as `EXACT` or `RELATED`:
+
+- `EXACT` directly represents the current page, region, component, rule, or Runtime
+  Unknown. Use it in target/context `knowledge_ref` fields and `ui_runtime_ref`.
+- `RELATED` only supports the capability or profile context. Use it only in
+  `required_capabilities[].ui_knowledge_refs` and `knowledge.ui_profile_refs`.
+
+Same-page or same-component relevance is not enough for `EXACT`. Prefer EXACT, otherwise
+downgrade to RELATED, otherwise use `null`. Never manufacture an ID from a Step,
+Capability, Intent, or Runtime Unknown ID (for example `RU-01`).
+
+Do not expand a Page ID across backend/frontend scope, use a generic Popup/Overlay
+Component as an exact business target, or use a page-level ID as an exact Region ID.
 
 If no `ui-knowledge/` is available, the Intent may still be generated from the Test
 Case/PRD/Prototype, but every UI `knowledge_ref` and `ui_runtime_ref` must be `null` and
@@ -239,6 +251,10 @@ After generating or updating the file, report:
 - `runtime_unknown_business_assertion_conflicts` (must be `0`);
 - `automation_asset_reads` (must be `0`);
 - `lifecycle_stage`.
+- `reference_quality.exact_refs`;
+- `reference_quality.related_refs`;
+- `reference_quality.unresolved_refs`;
+- `reference_quality.suspected_overmatches` (must be `0`).
 
 Do not silently report PASS when `pseudo_reference_count` or
 `runtime_unknown_business_assertion_conflicts` is non-zero, when any asset read is
