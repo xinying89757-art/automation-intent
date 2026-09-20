@@ -1,17 +1,34 @@
 pages:
   - knowledge_id: page-prod
+    kind: page
+    scope: BACKOFFICE_PRODUCT_MANAGEMENT
     business_terms: [产品, 产品管理, 产品列表, 产品详情]
+    region_ids: [prod-management]
     component_ids: [component-module-navigation, component-page-settings-panel, component-product-url-editor, component-password-access-control, component-password-gate]
     permission_refs: [permission-product-page-settings]
     runtime_refs: [runtime-navigation-controller-resolution, runtime-password-page-presentation, runtime-password-verification-transition]
 components:
   - knowledge_id: component-module-navigation
+    kind: component
+    exact_target_allowed: true
     role: UI_SURFACE
   - knowledge_id: component-page-settings-panel
+    kind: component
+    exact_target_allowed: true
     role: UI_SURFACE
   - knowledge_id: component-product-url-editor
+    kind: component
+    exact_target_allowed: true
     role: UI_SURFACE
   - knowledge_id: component-password-access-control
+    kind: component
+    exact_target_allowed: true
     role: UI_SURFACE
   - knowledge_id: component-password-gate
+    kind: component
+    exact_target_allowed: true
     role: UI_SURFACE
+  - knowledge_id: component-popup-layer
+    kind: component
+    exact_target_allowed: false
+    role: UI_BEHAVIOR
