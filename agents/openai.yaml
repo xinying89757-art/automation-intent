@@ -1,7 +1,7 @@
 interface:
   display_name: "Automation Intent"
   short_description: "Build traceable UI automation intent YAML"
-  default_prompt: "Use $automation-intent to generate a PRE_RUNTIME automation-intent.yaml from the supplied Test Case, PRD, Prototype, and ui-knowledge; resolve ui-match-index.yaml first, preserve real UI Knowledge IDs, keep business Assertions separate from runtime presentation Unknowns, use canonical preferred_asset_types, explicitly degrade when ui-knowledge is absent, do not read automation-assets, match assets, or generate Locators."
+  default_prompt: "Use $automation-intent to generate a PRE_RUNTIME automation-intent.yaml from the supplied Test Case, PRD, Prototype, and ui-knowledge; resolve ui-match-index.yaml first, classify UI references as EXACT or RELATED without broadening page/region/component scope, keep business Assertions separate from runtime presentation Unknowns, use canonical preferred_asset_types, explicitly degrade when ui-knowledge is absent, do not read automation-assets, match assets, or generate Locators."
 
 policy:
   allow_implicit_invocation: true
