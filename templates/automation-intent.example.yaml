@@ -83,14 +83,14 @@ intent:
   ui_context:
     entry:
       semantic_path: ["产品", "产品管理", "目标产品编辑", "页面设置", "基础设置"]
-      knowledge_refs: [page-prod, component-module-navigation, component-page-settings-panel]
+      knowledge_refs: [page-prod, component-module-navigation]
     target_page:
-      semantic_name: "产品详情页"
+      semantic_name: "后台产品管理页"
       knowledge_ref: page-prod
       resolution_status: RESOLVED
     target_region:
-      semantic_name: "页面设置基础设置"
-      knowledge_ref: component-page-settings-panel
+      semantic_name: "产品列表与工具区"
+      knowledge_ref: prod-management
       resolution_status: RESOLVED
     related_components:
       - semantic_name: "产品模块导航"
@@ -109,8 +109,8 @@ intent:
     - id: S1
       intent: "进入产品管理并打开目标产品编辑页"
       context:
-        page: {semantic_name: "产品管理", knowledge_ref: page-prod}
-        region: {semantic_name: "产品列表", knowledge_ref: page-prod}
+        page: {semantic_name: "后台产品管理页", knowledge_ref: page-prod}
+        region: {semantic_name: "产品列表与工具区", knowledge_ref: prod-management}
       anchor:
         primary: {semantic_name: "目标产品", value_ref: "${target_product}"}
         secondary: []
@@ -127,8 +127,8 @@ intent:
     - id: S2
       intent: "配置目标产品的带目录自定义URL并保存"
       context:
-        page: {semantic_name: "产品编辑页", knowledge_ref: page-prod}
-        region: {semantic_name: "产品URL", knowledge_ref: component-product-url-editor}
+        page: {semantic_name: "后台产品管理页", knowledge_ref: page-prod}
+        region: {semantic_name: "产品URL设置", knowledge_ref: null}
       anchor:
         primary: {semantic_name: "产品URL设置"}
         secondary: []
@@ -145,15 +145,15 @@ intent:
     - id: S3
       intent: "打开目标产品页面设置的基础设置"
       context:
-        page: {semantic_name: "产品编辑页", knowledge_ref: page-prod}
-        region: {semantic_name: "页面设置", knowledge_ref: component-page-settings-panel}
+        page: {semantic_name: "后台产品管理页", knowledge_ref: page-prod}
+        region: {semantic_name: "页面设置", knowledge_ref: null}
       anchor:
         primary: {semantic_name: "页面设置"}
         secondary: []
       target:
         semantic_name: "基础设置页签"
         expected_type: TAB_OR_PANEL
-        knowledge_ref: component-page-settings-panel
+        knowledge_ref: null
       action: {type: OPEN, value_ref: null}
       expected_transition:
         - {type: REGION_VISIBLE, semantic_target: "访问权限区域"}
@@ -163,8 +163,8 @@ intent:
     - id: S4
       intent: "配置密码访问并保存页面权限"
       context:
-        page: {semantic_name: "页面设置基础设置", knowledge_ref: component-page-settings-panel}
-        region: {semantic_name: "访问权限", knowledge_ref: component-password-access-control}
+        page: {semantic_name: "后台产品管理页", knowledge_ref: page-prod}
+        region: {semantic_name: "访问权限", knowledge_ref: null}
       anchor:
         primary: {semantic_name: "访问权限"}
         secondary: []
@@ -181,15 +181,15 @@ intent:
     - id: S5
       intent: "在无痕未登录窗口打开产品详情的带目录自定义URL"
       context:
-        page: {semantic_name: "前台产品详情", knowledge_ref: page-prod}
-        region: {semantic_name: "产品访问入口", knowledge_ref: page-prod}
+        page: {semantic_name: "前台产品详情页", knowledge_ref: null}
+        region: {semantic_name: "产品访问入口", knowledge_ref: null}
       anchor:
         primary: {semantic_name: "产品自定义URL", value_ref: "${custom_product_path}"}
         secondary: []
       target:
         semantic_name: "产品详情访问地址"
         expected_type: URL_ENTRY
-        knowledge_ref: page-prod
+        knowledge_ref: null
       action: {type: OPEN, value_ref: "${custom_product_path}"}
       expected_transition:
         - {type: PAGE_OR_REGION_VISIBLE, semantic_target: "密码输入页"}
@@ -199,8 +199,8 @@ intent:
     - id: S6
       intent: "在密码输入页提交正确密码"
       context:
-        page: {semantic_name: "密码输入页", knowledge_ref: component-password-gate}
-        region: {semantic_name: "密码验证区域", knowledge_ref: component-password-gate}
+        page: {semantic_name: "前台产品详情页", knowledge_ref: null}
+        region: {semantic_name: "密码验证区域", knowledge_ref: null}
       anchor:
         primary: {semantic_name: "页面权限密码"}
         secondary: []
@@ -217,8 +217,8 @@ intent:
     - id: S7
       intent: "确认未验证时显示密码输入页且不显示产品内容"
       context:
-        page: {semantic_name: "前台产品详情", knowledge_ref: page-prod}
-        region: {semantic_name: "密码访问状态", knowledge_ref: component-password-gate}
+        page: {semantic_name: "前台产品详情页", knowledge_ref: null}
+        region: {semantic_name: "密码访问状态", knowledge_ref: null}
       anchor:
         primary: {semantic_name: "密码输入页"}
         secondary: []
@@ -235,15 +235,15 @@ intent:
     - id: S8
       intent: "确认正确密码验证后显示产品内容"
       context:
-        page: {semantic_name: "前台产品详情", knowledge_ref: page-prod}
-        region: {semantic_name: "产品内容", knowledge_ref: page-prod}
+        page: {semantic_name: "前台产品详情页", knowledge_ref: null}
+        region: {semantic_name: "产品内容", knowledge_ref: null}
       anchor:
         primary: {semantic_name: "产品内容"}
         secondary: []
       target:
         semantic_name: "产品详情内容"
         expected_type: CONTENT_REGION
-        knowledge_ref: page-prod
+        knowledge_ref: null
       action: {type: ASSERT, value_ref: null}
       expected_transition:
         - {type: BUSINESS_RESULT_VISIBLE, semantic_target: "产品内容可见"}
@@ -252,9 +252,9 @@ intent:
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
   required_capabilities:
     - {id: CAP-01, capability: navigate_to_product_management, semantic_name: "进入产品管理", category: NAVIGATION, required: true, step_refs: [S1], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-module-navigation]}
-    - {id: CAP-02, capability: open_target_product_editor, semantic_name: "打开目标产品编辑页", category: NAVIGATION, required: true, step_refs: [S1], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod]}
+    - {id: CAP-02, capability: open_target_product_editor, semantic_name: "打开目标产品编辑页", category: NAVIGATION, required: true, step_refs: [S1], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, runtime-ajax-pagination-and-sort]}
     - {id: CAP-03, capability: configure_product_custom_url, semantic_name: "配置并保存产品自定义URL", category: BUSINESS_ACTION, required: true, step_refs: [S2], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-product-url-editor]}
-    - {id: CAP-04, capability: open_product_page_settings, semantic_name: "打开产品页面设置基础设置", category: NAVIGATION, required: true, step_refs: [S3], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-page-settings-panel]}
+    - {id: CAP-04, capability: open_product_page_settings, semantic_name: "打开产品页面设置基础设置", category: NAVIGATION, required: true, step_refs: [S3], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [page-prod, component-page-settings-panel, component-popup-layer, runtime-popup-mount-and-obscuration]}
     - {id: CAP-05, capability: configure_password_access, semantic_name: "配置并保存密码访问", category: BUSINESS_ACTION, required: true, step_refs: [S4], preferred_asset_types: [business_action, page_object], ui_knowledge_refs: [component-page-settings-panel, component-password-access-control]}
     - {id: CAP-06, capability: open_product_custom_url_in_clean_browser, semantic_name: "在无痕未登录状态打开受保护产品URL", category: ENVIRONMENT, required: true, step_refs: [S5], preferred_asset_types: [environment_helper, business_action], ui_knowledge_refs: [page-prod, runtime-password-page-presentation]}
     - {id: CAP-07, capability: assert_password_gate_state, semantic_name: "验证密码保护页状态", category: ASSERTION, required: true, step_refs: [S7], preferred_asset_types: [assertion, page_object], ui_knowledge_refs: [page-prod, component-password-gate]}
@@ -270,14 +270,14 @@ intent:
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
     - id: A-02
       type: VISIBILITY
-      target: {semantic_name: "产品内容", knowledge_ref: page-prod}
+      target: {semantic_name: "产品内容", knowledge_ref: null}
       expected: {value: false, semantic_name: "未验证时产品内容不可见"}
       required_capability_ref: CAP-07
       required: true
       source_refs: [{type: TEST_CASE, ref: "TC_PD_001"}]
     - id: A-03
       type: VISIBILITY
-      target: {semantic_name: "产品内容", knowledge_ref: page-prod}
+      target: {semantic_name: "产品内容", knowledge_ref: null}
       expected: {value: true, semantic_name: "正确密码验证后产品内容可见"}
       required_capability_ref: CAP-09
       required: true
@@ -290,10 +290,10 @@ intent:
     inferred: []
     ui_profile_refs:
       pages: [page-prod]
-      components: [component-module-navigation, component-page-settings-panel, component-product-url-editor, component-password-access-control, component-password-gate]
+      components: [component-module-navigation, component-page-settings-panel, component-product-url-editor, component-password-access-control, component-password-gate, component-popup-layer]
       interaction_rules: [rule-product-custom-url, rule-password-access]
       permissions: [permission-product-page-settings]
-      runtime_refs: [runtime-navigation-controller-resolution, runtime-popup-mount-and-obscuration, runtime-custom-url-save-transition, runtime-page-settings-entry, runtime-password-page-presentation, runtime-password-verification-transition]
+      runtime_refs: [runtime-navigation-controller-resolution, runtime-popup-mount-and-obscuration, runtime-custom-url-save-transition, runtime-page-settings-entry, runtime-password-page-presentation, runtime-password-verification-transition, runtime-ajax-pagination-and-sort]
   runtime_unknowns:
     - id: RU-01
       question: "产品管理入口在真实页面中的导航呈现和入口解析方式是什么？"
@@ -316,13 +316,13 @@ intent:
       preferred_resolution: UI_EXPLORATION
       status: OPEN
     - id: RU-03
-      question: "页面设置入口在真实 UI 中以什么控件形式出现，以及如何识别“基础设置”当前选中状态？"
+      question: "用于打开页面设置的控件语义是什么，以及如何识别页面设置中的“基础设置”状态？"
       category: OVERLAY_BEHAVIOR
       blocking: true
       priority: P1
       applies_to: {steps: [S3], capabilities: [CAP-04]}
-      source: {type: UI_PROFILE_RUNTIME_REQUIRED, ref: runtime-page-settings-entry}
-      ui_runtime_ref: runtime-page-settings-entry
+      source: {type: TEST_CASE, ref: TC_PD_001}
+      ui_runtime_ref: null
       preferred_resolution: UI_EXPLORATION
       status: OPEN
     - id: RU-04
@@ -331,8 +331,8 @@ intent:
       blocking: true
       priority: P1
       applies_to: {steps: [S4], capabilities: [CAP-05]}
-      source: {type: UI_PROFILE_RUNTIME_REQUIRED, ref: runtime-popup-mount-and-obscuration}
-      ui_runtime_ref: runtime-popup-mount-and-obscuration
+      source: {type: TEST_CASE, ref: TC_PD_001}
+      ui_runtime_ref: null
       preferred_resolution: UI_EXPLORATION
       status: OPEN
     - id: RU-05
@@ -376,3 +376,12 @@ intent:
     blocking_issues: []
     conflicts: []
     warnings: []
+    reference_quality:
+      exact_refs:
+        count: 23
+      related_refs:
+        count: 36
+      unresolved_refs:
+        count: 18
+      suspected_overmatches:
+        count: 0
