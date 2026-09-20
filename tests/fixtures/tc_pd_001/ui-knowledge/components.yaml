@@ -1,11 +1,25 @@
 components:
   - knowledge_id: component-module-navigation
+    kind: component
+    exact_target_allowed: true
     semantic_name: 产品模块导航
   - knowledge_id: component-page-settings-panel
+    kind: component
+    exact_target_allowed: true
     semantic_name: 页面设置面板
   - knowledge_id: component-product-url-editor
+    kind: component
+    exact_target_allowed: true
     semantic_name: 产品URL编辑器
   - knowledge_id: component-password-access-control
+    kind: component
+    exact_target_allowed: true
     semantic_name: 密码访问控件
   - knowledge_id: component-password-gate
+    kind: component
+    exact_target_allowed: true
     semantic_name: 密码输入页
+  - knowledge_id: component-popup-layer
+    kind: component
+    exact_target_allowed: false
+    semantic_name: 通用Popup与Overlay层
