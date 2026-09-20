@@ -1,4 +1,11 @@
 pages:
   - knowledge_id: page-prod
-    semantic_name: 产品管理与产品详情
+    kind: page
+    scope: BACKOFFICE_PRODUCT_MANAGEMENT
+    semantic_name: 后台产品管理页
     component_ids: [component-module-navigation, component-page-settings-panel]
+    regions:
+      - region_id: prod-management
+        kind: region
+        semantic_name: 产品列表与工具区
+        terms: [产品列表, 产品列表与工具区]
