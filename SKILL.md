@@ -97,6 +97,11 @@ user specifies another path. If the file already exists, update the matching sta
    decision, priority, affected Steps/Capabilities, UI runtime reference, and a
    preferred resolution. `blocking: true` means the affected Step must not execute
    before resolution; it does not prevent generating the Intent or matching assets.
+   Runtime Unknowns must ask how the UI is presented, identified, operated, or observed;
+   they must not ask whether a Test Case/PRD assertion occurs. For TC_PD_001, ask what
+   control presents the page settings entry and how the selected “基础设置” state is
+   identified, not whether that tab is selected; ask how the password control is rendered
+   and identified, not whether it appears.
 10. If `ui-knowledge/` is absent, explicitly degrade: use `null` for every
     `knowledge_ref` and `ui_runtime_ref`, add the `UI_KNOWLEDGE_NOT_AVAILABLE` warning,
     and do not invent a profile or runtime ID. A non-null UI reference is valid only if
@@ -176,6 +181,24 @@ collapse an entire Case into one `business_flow` capability.
 automation. Skill boundaries such as “does not generate Locators or match assets” belong
 in this Skill, not in `excluded_points`; use `[]` when no test point is excluded.
 
+`preferred_asset_types` uses only this canonical Automation Asset Registry vocabulary:
+
+`auth`, `business_action`, `assertion`, `wait_strategy`, `ui_component`,
+`locator_strategy`, `fixture`, `test_data`, `environment_helper`, `business_flow`,
+`page_object`, `runtime_helper`, `state_manager`.
+
+Do not invent synonyms. Normalize `environment_setup` to `environment_helper` and
+`assertion_helper` to `assertion`. This is a static type protocol only; it does not
+authorize Asset Matching or reading `automation-assets/`.
+
+For TC_PD_001, prefer stable reusable capabilities such as
+`navigate_to_product_management`, `open_target_product_editor`,
+`configure_product_custom_url`, `open_product_page_settings`,
+`configure_password_access`, `open_product_custom_url_in_clean_browser`,
+`assert_password_gate_state`, `complete_frontend_password_verification`, and
+`assert_product_detail_content_visible`. The exact count may vary with the source Steps,
+but it should represent reusable abilities rather than one capability per micro-action.
+
 ## Data and security rules
 
 Test-data variables use references such as `${customer_name}` and `${target_employee}`.
@@ -216,5 +239,10 @@ After generating or updating the file, report:
 - `runtime_unknown_business_assertion_conflicts` (must be `0`);
 - `automation_asset_reads` (must be `0`);
 - `lifecycle_stage`.
+
+Do not silently report PASS when `pseudo_reference_count` or
+`runtime_unknown_business_assertion_conflicts` is non-zero, when any asset read is
+detected, or when available UI Knowledge clearly matches the business semantics but all
+related `knowledge_ref` fields remain null.
 
 The summary is a report only. It must not contain an asset selection or Locator.
