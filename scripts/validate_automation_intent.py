@@ -114,6 +114,7 @@ UI_ID_KEYS = {
     "id",
     "knowledge_id",
     "page_id",
+    "region_id",
     "component_id",
     "interaction_rule_id",
     "rule_id",
@@ -154,10 +155,17 @@ class Validator:
         self.ui_knowledge_ids: set[str] = set()
         self.ui_runtime_ids: set[str] = set()
         self.ui_match_terms: set[str] = set()
+        self.ui_metadata: dict[str, dict] = {}
         self.ui_refs_resolved = 0
         self.ui_refs_unresolved = 0
         self.pseudo_reference_count = 0
         self.runtime_unknown_business_assertion_conflicts = 0
+        self.reference_quality = {
+            "exact_refs": 0,
+            "related_refs": 0,
+            "unresolved_refs": 0,
+            "suspected_overmatches": 0,
+        }
 
     def error(self, message: str) -> None:
         self.errors.append(message)
@@ -209,6 +217,7 @@ class Validator:
         self.check_ui_knowledge_references(intent)
         self.check_runtime_enrichment(intent)
         self.check_runtime_unknown_business_conflicts(intent)
+        self.check_reference_quality(intent)
         self.check_readiness(intent)
 
     def warning(self, message: str) -> None:
@@ -267,6 +276,25 @@ class Validator:
         elif active and isinstance(node, str) and len(node.strip()) >= 2:
             self.ui_match_terms.add(node.strip())
 
+    def _collect_ui_metadata(self, node: object, source_file: str) -> None:
+        if isinstance(node, dict):
+            identifier = None
+            for key in UI_ID_KEYS:
+                if isinstance(node.get(key), str) and node[key]:
+                    identifier = node[key]
+                    break
+            if identifier:
+                metadata = dict(node)
+                metadata["_source_file"] = source_file
+                existing = self.ui_metadata.get(identifier, {})
+                existing.update(metadata)
+                self.ui_metadata[identifier] = existing
+            for value in node.values():
+                self._collect_ui_metadata(value, source_file)
+        elif isinstance(node, list):
+            for value in node:
+                self._collect_ui_metadata(value, source_file)
+
     def _load_ui_knowledge_ids(self) -> None:
         root = self._find_ui_knowledge_root()
         if root is None:
@@ -284,6 +312,7 @@ class Validator:
                 continue
             file_ids: set[str] = set()
             self._collect_ui_ids(loaded, file_ids)
+            self._collect_ui_metadata(loaded, filename)
             self.ui_knowledge_ids.update(file_ids)
             if filename == "runtime-required.yaml":
                 self.ui_runtime_ids.update(file_ids)
@@ -313,9 +342,88 @@ class Validator:
                             refs.append((value, f"intent.knowledge.ui_profile_refs.{kind}[{index}]", kind))
         return refs
 
+    def _reference_quality_counts(self, intent: dict) -> tuple[list[tuple[str, str, object]], list[tuple[str, str]], int]:
+        exact: list[tuple[str, str, object]] = []
+        related: list[tuple[str, str]] = []
+        unresolved = 0
+
+        def walk(node: object, path: str) -> None:
+            nonlocal unresolved
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    current = f"{path}.{key}"
+                    if key in {"knowledge_ref", "ui_runtime_ref"}:
+                        if isinstance(value, str):
+                            exact.append((value, current, node))
+                        elif value is None:
+                            unresolved += 1
+                    elif key == "knowledge_refs" and path == "intent.ui_context.entry":
+                        if isinstance(value, list):
+                            for index, item in enumerate(value):
+                                if isinstance(item, str):
+                                    exact.append((item, f"{current}[{index}]", node))
+                    walk(value, current)
+            elif isinstance(node, list):
+                for index, value in enumerate(node):
+                    walk(value, f"{path}[{index}]")
+
+        walk(intent, "intent")
+        capabilities = intent.get("required_capabilities", [])
+        for index, capability in enumerate(capabilities if isinstance(capabilities, list) else []):
+            if not isinstance(capability, dict):
+                continue
+            values = capability.get("ui_knowledge_refs", [])
+            if isinstance(values, list):
+                related.extend(
+                    (value, f"intent.required_capabilities[{index}].ui_knowledge_refs[{item_index}]")
+                    for item_index, value in enumerate(values)
+                    if isinstance(value, str)
+                )
+        profile_refs = intent.get("knowledge", {}).get("ui_profile_refs", {})
+        if isinstance(profile_refs, dict):
+            for kind, values in profile_refs.items():
+                if isinstance(values, list):
+                    related.extend(
+                        (value, f"intent.knowledge.ui_profile_refs.{kind}[{index}]")
+                        for index, value in enumerate(values)
+                        if isinstance(value, str)
+                    )
+        return exact, related, unresolved
+
+    def _semantic_overmatch_count(self, exact_refs: list[tuple[str, str, object]], intent: dict) -> int:
+        suspected = 0
+        for ref, path, owner in exact_refs:
+            metadata = self.ui_metadata.get(ref, {})
+            semantic_name = owner.get("semantic_name", "") if isinstance(owner, dict) else ""
+            semantic_name = str(semantic_name)
+            kind = metadata.get("kind")
+            if metadata.get("exact_target_allowed") is False:
+                suspected += 1
+                self.error(f"EXACT UI reference is not targetable at {path}: {ref}")
+            if kind == "page" and (".region." in path or "target_region" in path):
+                suspected += 1
+                self.error(f"Page Knowledge cannot be used as an exact Region reference at {path}: {ref}")
+            if kind == "component" and (".region." in path or "target_region" in path):
+                suspected += 1
+                self.error(f"Component Knowledge cannot represent an exact Region at {path}: {ref}")
+            scope = str(metadata.get("scope", ""))
+            if scope == "BACKOFFICE_PRODUCT_MANAGEMENT" and re.search(r"前台|产品详情", semantic_name):
+                suspected += 1
+                self.error(f"Backend Page Knowledge is over-broad for frontend/detail target at {path}: {ref}")
+            terms = metadata.get("terms", [])
+            if kind == "region" and isinstance(terms, list) and semantic_name:
+                if not any(isinstance(term, str) and term in semantic_name for term in terms):
+                    suspected += 1
+                    self.error(f"Region Knowledge does not match the named Region at {path}: {ref}")
+        return suspected
+
     def check_ui_knowledge_references(self, intent: dict) -> None:
         self._load_ui_knowledge_ids()
         refs = self._intent_ui_refs(intent)
+        exact_refs, related_refs, unresolved_refs = self._reference_quality_counts(intent)
+        self.reference_quality["exact_refs"] = len(exact_refs)
+        self.reference_quality["related_refs"] = len(related_refs)
+        self.reference_quality["unresolved_refs"] = unresolved_refs
         if not self.ui_knowledge_available:
             self.ui_refs_unresolved = len(refs)
             if refs:
@@ -336,6 +444,8 @@ class Validator:
                         f"Runtime Unknown {unknown.get('id')} cannot use UI_PROFILE_RUNTIME_REQUIRED without ui-knowledge"
                     )
             return
+
+        self.reference_quality["suspected_overmatches"] = self._semantic_overmatch_count(exact_refs, intent)
 
         if not refs and self._has_clear_ui_match(intent):
             self.error(
@@ -358,14 +468,52 @@ class Validator:
             if not isinstance(unknown, dict):
                 continue
             source = unknown.get("source")
+            runtime_ref = unknown.get("ui_runtime_ref")
+            if runtime_ref is not None and (
+                not isinstance(source, dict) or source.get("type") != "UI_PROFILE_RUNTIME_REQUIRED"
+            ):
+                self.error(
+                    f"Runtime Unknown {unknown.get('id')} ui_runtime_ref requires UI_PROFILE_RUNTIME_REQUIRED source"
+                )
             if not isinstance(source, dict) or source.get("type") != "UI_PROFILE_RUNTIME_REQUIRED":
                 continue
             source_ref = source.get("ref")
-            runtime_ref = unknown.get("ui_runtime_ref")
             if source_ref not in self.ui_runtime_ids:
                 self.error(f"Runtime Unknown {unknown.get('id')} source.ref is not a runtime-required ID: {source_ref}")
             if runtime_ref not in self.ui_runtime_ids:
                 self.error(f"Runtime Unknown {unknown.get('id')} ui_runtime_ref is not a runtime-required ID: {runtime_ref}")
+            runtime_metadata = self.ui_metadata.get(runtime_ref, {})
+            for required_key in ("reason", "verification_method", "resolves"):
+                if not runtime_metadata.get(required_key):
+                    self.reference_quality["suspected_overmatches"] += 1
+                    self.error(
+                        f"Runtime Required {runtime_ref} is missing semantic field {required_key}"
+                    )
+            if runtime_ref and source.get("type") != "UI_PROFILE_RUNTIME_REQUIRED":
+                self.error(f"Runtime Unknown {unknown.get('id')} ui_runtime_ref requires UI_PROFILE_RUNTIME_REQUIRED source")
+            if runtime_ref and isinstance(unknown.get("question"), str):
+                resolves = str(runtime_metadata.get("resolves", ""))
+                if resolves and not self._shares_semantic_phrase(unknown["question"], resolves):
+                    self.reference_quality["suspected_overmatches"] += 1
+                    self.error(
+                        f"Runtime Required {runtime_ref} does not directly resolve Runtime Unknown {unknown.get('id')}"
+                    )
+
+        if self.reference_quality["suspected_overmatches"]:
+            self.error("reference_quality.suspected_overmatches must be 0")
+
+    def _shares_semantic_phrase(self, left: str, right: str) -> bool:
+        left_tokens = re.findall(r"[\u4e00-\u9fff]{3,}|[A-Za-z][A-Za-z0-9_ -]{3,}", left)
+        right_tokens = re.findall(r"[\u4e00-\u9fff]{3,}|[A-Za-z][A-Za-z0-9_ -]{3,}", right)
+        if any(a in right or b in left for a in left_tokens for b in right_tokens):
+            return True
+        left_han = "".join(re.findall(r"[\u4e00-\u9fff]", left))
+        right_han = "".join(re.findall(r"[\u4e00-\u9fff]", right))
+        for text_value, other_value in ((left_han, right_han), (right_han, left_han)):
+            for index in range(max(0, len(text_value) - 3)):
+                if text_value[index : index + 4] in other_value:
+                    return True
+        return False
 
     def _has_clear_ui_match(self, intent: dict) -> bool:
         if not self.ui_match_terms:
@@ -456,6 +604,27 @@ class Validator:
                 self.error(
                     f"Runtime Unknown {unknown.get('id')} restates business assertion text: {', '.join(sorted(conflicts))}"
                 )
+
+    def check_reference_quality(self, intent: dict) -> None:
+        validation = intent.get("validation")
+        if not isinstance(validation, dict):
+            return
+        quality = validation.get("reference_quality")
+        if not isinstance(quality, dict):
+            self.error("validation.reference_quality must be a mapping")
+            return
+        expected = self.reference_quality
+        for key in ("exact_refs", "related_refs", "unresolved_refs", "suspected_overmatches"):
+            value = quality.get(key)
+            if not isinstance(value, dict) or not isinstance(value.get("count"), int):
+                self.error(f"validation.reference_quality.{key}.count must be an integer")
+                continue
+            if value["count"] != expected[key]:
+                self.error(
+                    f"validation.reference_quality.{key}.count={value['count']} does not match computed {expected[key]}"
+                )
+        if expected["suspected_overmatches"] != 0:
+            self.error("validation.reference_quality.suspected_overmatches must be 0")
 
     def check_lifecycle(self, lifecycle: object) -> None:
         if not isinstance(lifecycle, dict):
@@ -719,7 +888,11 @@ def main() -> int:
         f"pseudo_reference_count={validator.pseudo_reference_count} "
         f"runtime_unknown_business_assertion_conflicts={validator.runtime_unknown_business_assertion_conflicts} "
         "automation_asset_reads=0 "
-        f"lifecycle_stage={document.get('intent', {}).get('lifecycle', {}).get('stage') if isinstance(document, dict) and isinstance(document.get('intent'), dict) else 'UNKNOWN'}"
+        f"lifecycle_stage={document.get('intent', {}).get('lifecycle', {}).get('stage') if isinstance(document, dict) and isinstance(document.get('intent'), dict) else 'UNKNOWN'} "
+        f"reference_quality_exact_refs={validator.reference_quality['exact_refs']} "
+        f"reference_quality_related_refs={validator.reference_quality['related_refs']} "
+        f"reference_quality_unresolved_refs={validator.reference_quality['unresolved_refs']} "
+        f"reference_quality_suspected_overmatches={validator.reference_quality['suspected_overmatches']}"
     )
     if validator.errors:
         for error in validator.errors:
