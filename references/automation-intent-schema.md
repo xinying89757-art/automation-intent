@@ -203,6 +203,29 @@ When `ui-knowledge/` is unavailable, generation may continue, but all UI
 include `UI_KNOWLEDGE_NOT_AVAILABLE`. The absence itself is a warning, not a reason to
 invent a pseudo-reference.
 
+## 6.1 UI Knowledge reference precision
+
+Every UI Knowledge match is classified as either `EXACT` or `RELATED`:
+
+- `EXACT` directly represents the current page, region, component, rule, or Runtime
+  Unknown. It may be written to `context.page.knowledge_ref`,
+  `context.region.knowledge_ref`, `target.knowledge_ref`,
+  `ui_context.target_page.knowledge_ref`, `ui_context.target_region.knowledge_ref`,
+  `ui_context.entry.knowledge_refs`, or `ui_runtime_ref`.
+- `RELATED` is relevant context but does not directly represent the current target. It
+  may be written only to `required_capabilities[].ui_knowledge_refs` and
+  `knowledge.ui_profile_refs`.
+
+Being on the same page, in the same component family, or related to the same business
+flow is not enough for `EXACT`. Prefer exact match, otherwise downgrade to `RELATED`,
+otherwise use `null`. `null` is a valid result and is safer than an over-broad reference.
+
+A Page Knowledge ID must not expand across page scope. A backend product-management page
+does not become a frontend product-detail page merely because both mention “product”. A
+generic Popup/Overlay Component may support a capability but must not become the exact
+target of a page-settings entry unless the UI Profile directly proves that identity. A
+Region ID must directly represent the named Region; page membership alone is not enough.
+
 Allowed `resolution_status` values are `RESOLVED`, `PARTIALLY_RESOLVED`, and
 `UNRESOLVED`.
 
@@ -428,7 +451,9 @@ do not ask Runtime Unknown questions such as “是否出现？/是否选中？/
 
 If `source.type` is `UI_PROFILE_RUNTIME_REQUIRED`, both `source.ref` and
 `ui_runtime_ref` must be the exact ID of a real `ui-knowledge/runtime-required.yaml`
-record. If the question is inferred only from a Test Case or Prototype and no matching
+record whose `reason`, `verification_method`, and `resolves` directly help answer the
+current Runtime Unknown. Same-page, same-component, or business relevance alone is not
+enough. If the question is inferred only from a Test Case or Prototype and no matching
 UI Profile runtime record exists, use `source.type: TEST_CASE` or `PROTOTYPE` and set
 `ui_runtime_ref: null`. Never use pseudo IDs such as `product-page-settings-entry` or an
 Intent-local ID such as `RU-01` as a UI runtime reference.
@@ -517,6 +542,15 @@ validation:
   blocking_issues: []
   conflicts: []
   warnings: []
+  reference_quality:
+    exact_refs:
+      count: 0
+    related_refs:
+      count: 0
+    unresolved_refs:
+      count: 0
+    suspected_overmatches:
+      count: 0
 ```
 
 Set `ready_for_asset_matching: true` only when all are true:
@@ -541,6 +575,10 @@ Do not silently pass when `pseudo_reference_count > 0`,
 `runtime_unknown_business_assertion_conflicts > 0`, `automation_asset_reads > 0`, or
 when available `ui-knowledge` clearly matches the business semantics but all related
 UI references remain null.
+
+`validation.reference_quality` reports semantic reference quality. Its
+`suspected_overmatches.count` must be `0`; an over-broad Page, Region, Component, or
+Runtime Required binding is a validation failure even when the referenced ID exists.
 
 `validation.blocking_issues` and `validation.conflicts` are the designated place to
 record unresolved requirement/source disagreements. `validation.warnings` records
@@ -609,4 +647,9 @@ pseudo_reference_count: 0
 runtime_unknown_business_assertion_conflicts: 0
 automation_asset_reads: 0
 lifecycle_stage: PRE_RUNTIME|RUNTIME_ENRICHED|FINALIZED
+reference_quality:
+  exact_refs: <count>
+  related_refs: <count>
+  unresolved_refs: <count>
+  suspected_overmatches: 0
 ```
