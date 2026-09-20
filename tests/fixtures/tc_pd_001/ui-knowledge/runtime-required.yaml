@@ -1,13 +1,29 @@
 runtime_required:
   - runtime_id: runtime-navigation-controller-resolution
-    question: "产品管理入口在真实页面中的导航呈现和入口解析方式是什么？"
+    reason: "页面导航入口的控件语义与路由解析"
+    verification_method: "观察产品管理入口的可见控件类型和打开后的页面状态"
+    resolves: "产品管理入口的导航呈现和入口解析"
   - runtime_id: runtime-popup-mount-and-obscuration
-    question: "页面设置的承载和遮挡行为是什么？"
+    reason: "页面设置弹层的挂载、遮罩、层级和阻挡行为"
+    verification_method: "观察弹层、遮罩、层级和关闭行为"
+    resolves: "页面设置弹层的承载和遮挡表现"
   - runtime_id: runtime-custom-url-save-transition
-    question: "产品自定义URL保存后的交互呈现方式是什么？"
+    reason: "产品自定义URL保存后的交互呈现方式"
+    verification_method: "观察保存后的页面状态、刷新或异步更新"
+    resolves: "产品自定义URL保存后的交互呈现"
   - runtime_id: runtime-page-settings-entry
-    question: "页面设置在真实页面中以何种承载方式出现？"
+    reason: "页面设置入口的控件语义和基础设置状态识别"
+    verification_method: "观察入口控件类型以及基础设置当前选中状态"
+    resolves: "页面设置入口控件和基础设置选中状态"
   - runtime_id: runtime-password-page-presentation
-    question: "密码保护状态以何种页面或区域方式呈现？"
+    reason: "密码保护状态的页面或区域呈现方式"
+    verification_method: "观察密码保护状态对应的页面、区域或弹层"
+    resolves: "密码保护状态的页面或区域呈现"
   - runtime_id: runtime-password-verification-transition
-    question: "密码验证成功后以刷新、跳转还是异步加载方式呈现内容？"
+    reason: "密码验证成功后的导航、刷新或异步内容更新"
+    verification_method: "观察验证后的URL、页面状态和内容加载变化"
+    resolves: "密码验证成功后的刷新、跳转或异步加载内容"
+  - runtime_id: runtime-ajax-pagination-and-sort
+    reason: "产品列表的AJAX刷新、排序、分页和焦点恢复"
+    verification_method: "观察列表刷新、排序分页以及焦点和滚动状态"
+    resolves: "产品列表AJAX刷新排序分页"
