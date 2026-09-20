@@ -94,3 +94,12 @@ intent:
     conflicts: []
     warnings:
       - UI_KNOWLEDGE_NOT_AVAILABLE
+    reference_quality:
+      exact_refs:
+        count: 0
+      related_refs:
+        count: 0
+      unresolved_refs:
+        count: 2
+      suspected_overmatches:
+        count: 0
