@@ -83,6 +83,25 @@ PREFERRED_RESOLUTIONS = {
     "REQUIREMENT_CONFIRMATION",
     "TEST_DATA_PREPARATION",
 }
+PREFERRED_ASSET_TYPES = {
+    "auth",
+    "business_action",
+    "assertion",
+    "wait_strategy",
+    "ui_component",
+    "locator_strategy",
+    "fixture",
+    "test_data",
+    "environment_helper",
+    "business_flow",
+    "page_object",
+    "runtime_helper",
+    "state_manager",
+}
+LEGACY_ASSET_TYPE_ALIASES = {
+    "environment_setup": "environment_helper",
+    "assertion_helper": "assertion",
+}
 UI_KNOWLEDGE_FILES = (
     "ui-match-index.yaml",
     "runtime-required.yaml",
@@ -112,6 +131,10 @@ FORBIDDEN_INTENT_KEYS = {
 LOCATOR_PATTERN = re.compile(
     r"(?i)(?:\bcss\b|\bxpath\b|\bnth\b|locator\s*\(|dom[_ -]?depth)"
 )
+BUSINESS_ASSERTION_QUESTION_PATTERN = re.compile(
+    r"(?i)(?:是否|有无|有没有|does|whether|is)\s*.{0,40}"
+    r"(?:出现|显示|展示|选中|保存成功|隐藏|可见|appear|visible|selected|saved|hidden)"
+)
 SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 
 
@@ -130,6 +153,7 @@ class Validator:
         self.ui_knowledge_available = False
         self.ui_knowledge_ids: set[str] = set()
         self.ui_runtime_ids: set[str] = set()
+        self.ui_match_terms: set[str] = set()
         self.ui_refs_resolved = 0
         self.ui_refs_unresolved = 0
         self.pseudo_reference_count = 0
@@ -233,6 +257,16 @@ class Validator:
             for value in node:
                 self._collect_ui_ids(value, ids)
 
+    def _collect_match_terms(self, node: object, active: bool = False) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                self._collect_match_terms(value, active or key == "business_terms")
+        elif isinstance(node, list):
+            for value in node:
+                self._collect_match_terms(value, active)
+        elif active and isinstance(node, str) and len(node.strip()) >= 2:
+            self.ui_match_terms.add(node.strip())
+
     def _load_ui_knowledge_ids(self) -> None:
         root = self._find_ui_knowledge_root()
         if root is None:
@@ -253,6 +287,8 @@ class Validator:
             self.ui_knowledge_ids.update(file_ids)
             if filename == "runtime-required.yaml":
                 self.ui_runtime_ids.update(file_ids)
+            if filename == "ui-match-index.yaml":
+                self._collect_match_terms(loaded)
 
     def _intent_ui_refs(self, intent: dict) -> list[tuple[str, str, str]]:
         refs: list[tuple[str, str, str]] = []
@@ -301,6 +337,11 @@ class Validator:
                     )
             return
 
+        if not refs and self._has_clear_ui_match(intent):
+            self.error(
+                "ui-knowledge clearly matches the business semantics but all UI references are null"
+            )
+
         for ref, path, kind in refs:
             if ref in self.ui_knowledge_ids:
                 if kind in {"ui_runtime_ref", "runtime_refs"} and ref not in self.ui_runtime_ids:
@@ -325,6 +366,35 @@ class Validator:
                 self.error(f"Runtime Unknown {unknown.get('id')} source.ref is not a runtime-required ID: {source_ref}")
             if runtime_ref not in self.ui_runtime_ids:
                 self.error(f"Runtime Unknown {unknown.get('id')} ui_runtime_ref is not a runtime-required ID: {runtime_ref}")
+
+    def _has_clear_ui_match(self, intent: dict) -> bool:
+        if not self.ui_match_terms:
+            return False
+        semantic_text: list[str] = []
+        case = intent.get("case", {})
+        if isinstance(case, dict):
+            semantic_text.extend(str(case.get(key, "")) for key in ("name", "module"))
+        goal = intent.get("goal", {})
+        if isinstance(goal, dict):
+            for key in ("actor", "action", "object"):
+                item = goal.get(key)
+                if isinstance(item, dict):
+                    semantic_text.append(str(item.get("semantic_name", "")))
+            results = goal.get("expected_business_result", [])
+            if isinstance(results, list):
+                semantic_text.extend(str(item) for item in results)
+        for step in intent.get("steps", []) or []:
+            if not isinstance(step, dict):
+                continue
+            semantic_text.append(str(step.get("intent", "")))
+            for section in ("context", "anchor", "target"):
+                value = step.get(section)
+                if isinstance(value, dict):
+                    for item in value.values():
+                        if isinstance(item, dict):
+                            semantic_text.append(str(item.get("semantic_name", "")))
+        joined = " ".join(semantic_text)
+        return any(term in joined for term in self.ui_match_terms if len(term) >= 2)
 
     def check_runtime_enrichment(self, intent: dict) -> None:
         enrichment = intent.get("runtime_enrichment")
@@ -379,6 +449,8 @@ class Validator:
                 continue
             question = unknown["question"]
             conflicts = [token for token in tokens if token and token in question]
+            if BUSINESS_ASSERTION_QUESTION_PATTERN.search(question):
+                conflicts.append("business-result question form")
             if conflicts:
                 self.runtime_unknown_business_assertion_conflicts += 1
                 self.error(
@@ -495,6 +567,21 @@ class Validator:
                 self.error(f"invalid Capability category: {cap.get('id')}")
             if not isinstance(cap.get("capability"), str) or not SNAKE_CASE.match(cap.get("capability", "")):
                 self.error(f"Capability must be semantic snake_case: {cap.get('id')}")
+            asset_types = cap.get("preferred_asset_types")
+            if not isinstance(asset_types, list):
+                self.error(f"Capability {cap.get('id')} preferred_asset_types must be a list")
+            else:
+                for asset_type in asset_types:
+                    if asset_type not in PREFERRED_ASSET_TYPES:
+                        alias = LEGACY_ASSET_TYPE_ALIASES.get(asset_type)
+                        if alias:
+                            self.error(
+                                f"Capability {cap.get('id')} uses legacy asset type {asset_type}; use {alias}"
+                            )
+                        else:
+                            self.error(
+                                f"Capability {cap.get('id')} uses non-canonical asset type: {asset_type}"
+                            )
             for ref in cap.get("step_refs", []) or []:
                 if ref not in step_ids:
                     self.error(f"Capability {cap.get('id')} references unknown Step {ref}")
